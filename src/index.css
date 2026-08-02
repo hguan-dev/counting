@@ -421,7 +421,7 @@ button:disabled {
   width: min(1050px, 100%);
   min-height: 0;
   margin: 0 auto;
-  padding: 2.1rem 2.5rem 1.5rem;
+  padding: 4.4rem 2.5rem 1.5rem;
   border: 1px solid rgba(232, 197, 106, 0.2);
   border-radius: 44% 44% 22px 22px / 22% 22% 22px 22px;
   background:
@@ -436,7 +436,7 @@ button:disabled {
 
 .table-rule-arc {
   position: absolute;
-  top: 0.3rem;
+  top: 1.45rem;
   left: 50%;
   width: min(830px, 88%);
   height: 150px;
@@ -547,6 +547,31 @@ button:disabled {
 .playing-card.is-compact {
   width: 69px;
   border-radius: 5px;
+}
+
+.playing-card.is-peeling {
+  z-index: 20;
+  animation: cardPeel 950ms cubic-bezier(0.16, 0.78, 0.22, 1) both;
+  transform-origin: 12% 52%;
+}
+
+@keyframes cardPeel {
+  0% {
+    filter: brightness(0.72);
+    transform: perspective(700px) rotateY(88deg) translateX(-14px) scale(0.96);
+  }
+  42% {
+    filter: brightness(0.9);
+    transform: perspective(700px) rotateY(66deg) translateX(-9px) scale(1.02);
+  }
+  74% {
+    filter: brightness(1.08);
+    transform: perspective(700px) rotateY(-7deg) translateX(2px) scale(1.045);
+  }
+  100% {
+    filter: brightness(1);
+    transform: perspective(700px) rotateY(0deg) translateX(0) scale(1);
+  }
 }
 
 .hand-cards .playing-card + .playing-card {
@@ -1413,7 +1438,7 @@ button:disabled {
   .game-board {
     width: 100%;
     min-height: 570px;
-    padding: 2.7rem 0.65rem 1rem;
+    padding: 4.2rem 0.65rem 1rem;
     border-radius: 70px 70px 16px 16px / 28px 28px 16px 16px;
   }
 
@@ -1430,7 +1455,7 @@ button:disabled {
   }
 
   .table-rule-arc {
-    top: 0.2rem;
+    top: 1rem;
     width: 104%;
   }
 
@@ -1574,4 +1599,20 @@ button:disabled {
   width: 14px;
   height: 8px;
   border-radius: 999px;
+}
+
+.sick-reaction {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sick-reaction i {
+  position: absolute;
+  top: 0;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.28));
+  font-style: normal;
+  animation: sickReactionFall 1750ms cubic-bezier(0.2, 0.68, 0.3, 1) both;
 }

@@ -184,7 +184,10 @@ export const parseVoiceCommand = (transcript) => {
   if (/\b(?:buy|take|yes)\s+insurance\b|\binsurance\s+yes\b/.test(normalized)) return { type: 'insurance', buy: true };
   if (/\b(?:decline|no|skip)\s+insurance\b|\bno\s+insurance\b/.test(normalized)) return { type: 'insurance', buy: false };
 
+  if (/\bface\s+down\b/.test(normalized)) return { type: 'action', action: 'doubleFaceDown' };
+  if (/\bface\s+up\b/.test(normalized)) return { type: 'action', action: 'double' };
   if (/\b(hit|card)\b/.test(normalized)) return { type: 'action', action: 'hit' };
+  if (/^(?:i(?:'| a)?m\s+good|good)$/.test(normalized)) return { type: 'action', action: 'stand' };
   if (/\b(stand|stay|hold)\b/.test(normalized)) return { type: 'action', action: 'stand' };
   if (/\bdouble(?:\s+down)?\b/.test(normalized)) return { type: 'action', action: 'double' };
   if (/\b(?:split|resplit)\b/.test(normalized)) return { type: 'action', action: 'split' };
@@ -194,6 +197,7 @@ export const parseVoiceCommand = (transcript) => {
   if (/^(?:next|next\s+round|new\s+round|deal\s+again)$/.test(normalized)) return { type: 'nextRound' };
   if (/\b(?:deal|deal\s+cards|start\s+round)\b/.test(normalized)) return { type: 'deal' };
   if (/\bbang\b/.test(normalized)) return { type: 'celebrate' };
+  if (/\b(?:fuck|sickening|sick)\b/.test(normalized)) return { type: 'sickReaction' };
   if (/\b(?:proceed|do\s+it|play\s+anyway)\b/.test(normalized)) return { type: 'proceed' };
   if (/\b(?:correct\s+play|go\s+back|cancel)\b/.test(normalized)) return { type: 'cancel' };
   if (/\b(?:tip|hint|advice|recommended\s+(?:move|play)|correct\s+move|what\s+should\s+i\s+do|what(?:'s|\s+is)\s+the\s+(?:move|play))\b/.test(normalized)) return { type: 'tip' };
@@ -221,6 +225,34 @@ export const parseVoiceCommand = (transcript) => {
 export const parseVoiceAction = (transcript) => {
   const command = parseVoiceCommand(transcript);
   return command?.type === 'action' ? command.action : null;
+};
+
+export const shouldDispatchInterimCommand = (transcript, command) => {
+  if (!command) return false;
+  const normalized = String(transcript || '').toLowerCase().trim().replace(/[.!?]+$/, '');
+
+  if ([
+    'action',
+    'cancel',
+    'celebrate',
+    'evenMoney',
+    'insurance',
+    'nextRound',
+    'proceed',
+    'runIt',
+    'sickReaction',
+    'stackAndRun',
+    'tip',
+  ].includes(command.type)) return true;
+
+  if (command.type === 'count') return command.enabled === false;
+  if (command.type === 'speech') {
+    return command.enabled === false || /\bon$/.test(normalized);
+  }
+  if (command.type === 'studyGuide') {
+    return command.open === false || /^(?:open|show)\b|\bon$/.test(normalized);
+  }
+  return ['guard', 'popups', 'sound'].includes(command.type);
 };
 
 export const getRecognitionResult = (event) => {

@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { getCardAssetUrl } from '../utils/cardAssets';
 
-export default function PlayingCard({ card, hidden = false, compact = false, delay = 0 }) {
+export default function PlayingCard({
+  card,
+  hidden = false,
+  compact = false,
+  delay = 0,
+  peel = false,
+}) {
   const [imageFailed, setImageFailed] = useState(false);
   const assetUrl = getCardAssetUrl(card);
   const colorClass = card && (card.suit === '♥' || card.suit === '♦') ? 'is-red' : 'is-black';
@@ -20,7 +26,7 @@ export default function PlayingCard({ card, hidden = false, compact = false, del
 
   return (
     <div
-      className={`playing-card ${compact ? 'is-compact' : ''}`}
+      className={`playing-card ${compact ? 'is-compact' : ''} ${peel ? 'is-peeling' : ''}`}
       aria-label={`${card?.value || 'Unknown'} of ${card?.suit || 'unknown suit'}`}
       style={{ '--card-delay': `${delay}ms` }}
     >

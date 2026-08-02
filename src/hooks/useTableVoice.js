@@ -5,6 +5,7 @@ import {
   getRecognitionFailure,
   getRecognitionResult,
   scoreTableVoice,
+  shouldDispatchInterimCommand,
 } from '../utils/tableSpeech';
 import {
   KOKORO_VOICES,
@@ -57,6 +58,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const recognitionActiveRef = useRef(false);
   const restartTimerRef = useRef(null);
   const restartAllowedRef = useRef(true);
+  const eagerCommandRef = useRef({ key: '', timestamp: 0 });
 
   onCommandRef.current = onCommand;
   isListeningAllowedRef.current = isListeningAllowed;
@@ -102,11 +104,17 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     setVoiceStatus(voiceInputEnabledRef.current ? 'ready' : 'off');
   };
 
+  const interruptDealerSpeech = () => {
+    announcementIdRef.current += 1;
+    speakingRef.current = false;
+    window.speechSynthesis?.cancel();
+    stopKokoroSpeech();
+  };
+
   const startListening = () => {
     if (
       !voiceInputEnabledRef.current
       || !isListeningAllowedRef.current
-      || speakingRef.current
       || !recognitionRef.current
       || recognitionActiveRef.current
     ) return;
@@ -133,14 +141,38 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       setVoiceStatus('listening');
     };
     recognition.onaudiostart = () => setVoiceStatus('listening');
-    recognition.onspeechstart = () => setVoiceStatus('hearing');
+    recognition.onspeechstart = () => {
+      interruptDealerSpeech();
+      setVoiceStatus('hearing');
+    };
     recognition.onspeechend = () => setVoiceStatus('processing');
     recognition.onresult = (event) => {
       const result = getRecognitionResult(event);
       if (!result) return;
       setLastHeard(result.transcript);
+      const commandKey = JSON.stringify(result.command);
       if (!result.isFinal) {
+        if (shouldDispatchInterimCommand(result.transcript, result.command)) {
+          const now = Date.now();
+          if (
+            eagerCommandRef.current.key !== commandKey
+            || now - eagerCommandRef.current.timestamp > 1500
+          ) {
+            eagerCommandRef.current = { key: commandKey, timestamp: now };
+            setVoiceStatus('heard');
+            if (isListeningAllowedRef.current) onCommandRef.current?.(result.command);
+          }
+          return;
+        }
         setVoiceStatus('hearing');
+        return;
+      }
+      if (
+        eagerCommandRef.current.key === commandKey
+        && Date.now() - eagerCommandRef.current.timestamp <= 1500
+      ) {
+        eagerCommandRef.current = { key: '', timestamp: 0 };
+        setVoiceStatus('heard');
         return;
       }
       setVoiceStatus(result.command ? 'heard' : 'listening');
@@ -169,7 +201,6 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       if (
         voiceInputEnabledRef.current
         && isListeningAllowedRef.current
-        && !speakingRef.current
         && restartAllowedRef.current
       ) {
         restartTimerRef.current = window.setTimeout(startListening, 300);
@@ -219,7 +250,6 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     const speechParts = (Array.isArray(text) ? text : [text]).filter(Boolean);
     const fullText = speechParts.join(' ');
     setLastAnnouncement(fullText);
-    if (recognitionRef.current && !usesKokoro) stopListening();
     speakingRef.current = !usesKokoro;
     stopKokoroSpeech();
 
@@ -280,7 +310,6 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
         },
         () => {
           if (announcementId !== announcementIdRef.current) return;
-          if (recognitionRef.current) stopListening();
           speakingRef.current = true;
         },
       );
@@ -293,9 +322,12 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
           beginListening();
         })
         .catch(() => {
+          if (announcementId !== announcementIdRef.current) {
+            beginListening();
+            return;
+          }
           stopKokoroSpeech();
           setVoiceModelStatus('warming');
-          if (recognitionRef.current) stopListening();
           speakingRef.current = true;
           speakWithSystemVoice();
         });

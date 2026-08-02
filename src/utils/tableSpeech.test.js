@@ -12,6 +12,7 @@ import {
   parseVoiceAction,
   parseVoiceCommand,
   scoreTableVoice,
+  shouldDispatchInterimCommand,
 } from './tableSpeech';
 
 describe('table speech', () => {
@@ -51,6 +52,10 @@ describe('table speech', () => {
     expect(parseVoiceAction('hit me')).toBe('hit');
     expect(parseVoiceAction('I will stand')).toBe('stand');
     expect(parseVoiceAction('stay')).toBe('stand');
+    expect(parseVoiceAction("I'm good")).toBe('stand');
+    expect(parseVoiceAction('good')).toBe('stand');
+    expect(parseVoiceAction('face down')).toBe('doubleFaceDown');
+    expect(parseVoiceAction('face up')).toBe('double');
     expect(parseVoiceAction('I understand')).toBeNull();
     expect(parseVoiceAction('double down')).toBe('double');
   });
@@ -87,6 +92,9 @@ describe('table speech', () => {
     expect(parseVoiceCommand('stack it')).toEqual({ type: 'stackBet' });
     expect(parseVoiceCommand('stack it up')).toEqual({ type: 'stackAndRun' });
     expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });
+    expect(parseVoiceCommand('fuck')).toEqual({ type: 'sickReaction' });
+    expect(parseVoiceCommand('sickening')).toEqual({ type: 'sickReaction' });
+    expect(parseVoiceCommand('how sick is that')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count', enabled: true });
     expect(parseVoiceCommand('count off')).toEqual({ type: 'count', enabled: false });
     expect(parseVoiceCommand('dealer give me a tip')).toEqual({ type: 'tip' });
@@ -129,6 +137,20 @@ describe('table speech', () => {
       isFinal: false,
       transcript: 'two spots bet twenty',
     });
+  });
+
+  test('eagerly dispatches complete commands but waits on ambiguous prefixes', () => {
+    expect(shouldDispatchInterimCommand('hit', parseVoiceCommand('hit'))).toBe(true);
+    expect(shouldDispatchInterimCommand('run it', parseVoiceCommand('run it'))).toBe(true);
+    expect(shouldDispatchInterimCommand('face down', parseVoiceCommand('face down'))).toBe(true);
+    expect(shouldDispatchInterimCommand('count off', parseVoiceCommand('count off'))).toBe(true);
+    expect(shouldDispatchInterimCommand('count', parseVoiceCommand('count'))).toBe(false);
+    expect(shouldDispatchInterimCommand('stack it', parseVoiceCommand('stack it'))).toBe(false);
+    expect(shouldDispatchInterimCommand('stack it up', parseVoiceCommand('stack it up'))).toBe(true);
+    expect(shouldDispatchInterimCommand(
+      'two spots bet twenty',
+      parseVoiceCommand('two spots bet twenty'),
+    )).toBe(false);
   });
 
   test('explains microphone and speech-service failures', () => {

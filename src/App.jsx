@@ -53,6 +53,16 @@ const CONFETTI_PARTICLES = Array.from({ length: 96 }, (_, index) => ({
   rotation: `${180 + ((index * 83) % 540)}deg`,
 }));
 
+const SICK_REACTION_PARTICLES = Array.from({ length: 30 }, (_, index) => ({
+  delay: `${(index % 10) * 45}ms`,
+  drift: `${((index * 61) % 260) - 130}px`,
+  emoji: index % 3 === 0 ? '🤢' : '🤮',
+  left: `${2 + ((index * 43) % 96)}%`,
+  size: `${1.7 + (index % 5) * 0.22}rem`,
+}));
+
+const formatCards = cards => cards.map(card => `${card.value}${card.suit}`).join(' ');
+
 export default function App() {
   const shoeRef = useRef(new Shoe(6));
   const loggerRef = useRef(new GameLogger());
@@ -73,6 +83,7 @@ export default function App() {
   const [showCount, setShowCount] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [celebrationKey, setCelebrationKey] = useState(0);
+  const [sickReactionKey, setSickReactionKey] = useState(0);
   const [insuranceBets, setInsuranceBets] = useState([]);
   const [evenMoneyQueue, setEvenMoneyQueue] = useState([]);
   
@@ -148,6 +159,59 @@ export default function App() {
     ));
   };
 
+  const logRoundResults = (finalDealerHand, spots, finalInsuranceBets = []) => {
+    const dealerTotal = calculateTotal(finalDealerHand);
+    const dealerBlackjack = dealerTotal === 21 && finalDealerHand.length === 2;
+    spots.forEach((spot, spotIndex) => {
+      spot.subHands.forEach((hand, handIndex) => {
+        let returnAmount = 0;
+        if (hand.outcome === 'push') returnAmount = hand.bet;
+        if (hand.outcome === 'win') {
+          returnAmount = isNaturalBlackjack(hand) && !hand.evenMoneyAccepted
+            ? hand.bet * 2.5
+            : hand.bet * 2;
+        }
+        loggerRef.current.log(
+          'ROUND_RESULT',
+          `Spot ${spotIndex + 1}, hand ${handIndex + 1}: ${hand.outcome}; player ${calculateTotal(hand.cards)}, dealer ${dealerTotal}.`,
+          {
+            dealerCards: formatCards(finalDealerHand),
+            dealerTotal,
+            decksRemaining: shoeRef.current.decksRemaining.toFixed(2),
+            hand: handIndex + 1,
+            insurance: finalInsuranceBets[spotIndex] || 0,
+            net: returnAmount - hand.bet,
+            outcome: hand.outcome,
+            playerCards: formatCards(hand.cards),
+            playerTotal: calculateTotal(hand.cards),
+            returnAmount,
+            runningCount: shoeRef.current.visibleRunningCount,
+            spot: spotIndex + 1,
+            trueCount: shoeRef.current.trueCount,
+            wager: hand.bet,
+          },
+        );
+      });
+      const insuranceBet = finalInsuranceBets[spotIndex] || 0;
+      if (insuranceBet > 0) {
+        const insuranceReturn = dealerBlackjack ? insuranceBet * 3 : 0;
+        loggerRef.current.log(
+          'INSURANCE_RESULT',
+          `Spot ${spotIndex + 1} insurance ${dealerBlackjack ? 'won' : 'lost'}.`,
+          {
+            dealerCards: formatCards(finalDealerHand),
+            dealerTotal,
+            insurance: insuranceBet,
+            net: insuranceReturn - insuranceBet,
+            outcome: dealerBlackjack ? 'win' : 'loss',
+            returnAmount: insuranceReturn,
+            spot: spotIndex + 1,
+          },
+        );
+      }
+    });
+  };
+
   const deal = async (betsOverride = null) => {
     const activeBets = Array.isArray(betsOverride)
       ? betsOverride.slice(0, numHands)
@@ -171,7 +235,6 @@ export default function App() {
 
     setBankroll(b => b - totalWager);
     playSound('deal');
-    loggerRef.current.log('DEAL', `Wagered ${activeBets.map((bet, index) => `spot ${index + 1}: $${bet}`).join(', ')}. Total: $${totalWager}`);
     setInsuranceBets(new Array(numHands).fill(0));
     setEvenMoneyQueue([]);
     
@@ -191,12 +254,27 @@ export default function App() {
           status: 'playing',
           outcome: null,
           isSplitAce: false,
-          isSplitHand: false
+          isSplitHand: false,
+          doubleCardFaceDown: false,
+          doubleCardPeeling: false,
         }]
       });
     }
     const d2 = shoeRef.current.draw();
     setDealerHand([d1, d2]);
+    loggerRef.current.log(
+      'DEAL',
+      `Opened ${numHands} ${numHands === 1 ? 'spot' : 'spots'} for $${totalWager}.`,
+      {
+        bankroll: bankroll - totalWager,
+        dealerCards: `${formatCards([d1])} [hole]`,
+        decksRemaining: shoeRef.current.decksRemaining.toFixed(2),
+        playerCards: spots.map(spot => formatCards(spot.subHands[0].cards)).join(' | '),
+        runningCount: shoeRef.current.visibleRunningCount,
+        trueCount: shoeRef.current.trueCount,
+        wager: totalWager,
+      },
+    );
 
     const d1Val = d1.value;
     const isDealerTenOrFace = d1.numericValue === 10;
@@ -242,6 +320,7 @@ export default function App() {
 
       setBankroll(b => b + netReturn);
       setGameState('resolved');
+      logRoundResults([d1, d2], spots);
       playSound(netReturn > 0 ? 'chips' : 'loss');
       announce(
         `Dealer has blackjack. ${getRoundOutcomeSummary(spots)}. Round complete.`,
@@ -271,6 +350,7 @@ export default function App() {
     if (allResolved) {
       setBankroll(b => b + payoutReturn);
       setGameState('resolved');
+      logRoundResults([d1, d2], spots);
       playSound('win');
       announce(`Dealer upcard ${getSpokenCard(d1)}. Player blackjack. Round complete.`, { listenAfter: true });
     } else {
@@ -344,6 +424,17 @@ export default function App() {
     }
     if (buy) setBankroll(b => b - insTotalCost);
     setInsuranceBets(nextInsuranceBets);
+    loggerRef.current.log(
+      buy ? 'INSURANCE' : 'INSURANCE_DECLINED',
+      buy ? `Purchased $${insTotalCost} of insurance.` : 'Insurance declined.',
+      {
+        insurance: insTotalCost,
+        wager: spotsOverride.reduce(
+          (sum, spot) => sum + (spot.subHands[0]?.bet || 0),
+          0,
+        ),
+      },
+    );
 
     const totalWager = spotsOverride.reduce(
       (sum, spot) => sum + (spot.subHands[0]?.bet || 0),
@@ -375,6 +466,7 @@ export default function App() {
       setPlayerSpots(spots);
       setBankroll(b => b + netReturn);
       setGameState('resolved');
+      logRoundResults(dealerHand, spots, nextInsuranceBets);
       playSound(netReturn > 0 ? 'chips' : 'loss');
       announce(
         `Dealer has blackjack. ${getRoundOutcomeSummary(spots)}. Round complete.`,
@@ -422,6 +514,20 @@ export default function App() {
     shoeRef.current.visibleRunningCount += drawnCard.countValue;
     hand.cards.push(drawnCard);
     const total = calculateTotal(hand.cards);
+    loggerRef.current.log(
+      'HIT',
+      `Spot ${activeSpotIndex + 1}, hand ${activeSubHandIndex + 1} drew ${formatCards([drawnCard])} for ${total}.`,
+      {
+        decksRemaining: shoeRef.current.decksRemaining.toFixed(2),
+        hand: activeSubHandIndex + 1,
+        playerCards: formatCards(hand.cards),
+        playerTotal: total,
+        runningCount: shoeRef.current.visibleRunningCount,
+        spot: activeSpotIndex + 1,
+        trueCount: shoeRef.current.trueCount,
+        wager: hand.bet,
+      },
+    );
     
     if (total > 21) {
       hand.status = 'bust';
@@ -447,10 +553,21 @@ export default function App() {
     const hand = spots[activeSpotIndex].subHands[activeSubHandIndex];
     hand.status = 'stood';
     playSound('stand');
+    loggerRef.current.log(
+      'STAND',
+      `Spot ${activeSpotIndex + 1}, hand ${activeSubHandIndex + 1} stood on ${calculateTotal(hand.cards)}.`,
+      {
+        hand: activeSubHandIndex + 1,
+        playerCards: formatCards(hand.cards),
+        playerTotal: calculateTotal(hand.cards),
+        spot: activeSpotIndex + 1,
+        wager: hand.bet,
+      },
+    );
     advancePointer(spots, false, `Player stands on ${getSpokenHandTotal(hand.cards)}.`);
   };
 
-  const executeDouble = () => {
+  const executeDouble = (faceDown = false) => {
     let spots = JSON.parse(JSON.stringify(playerSpots));
     let hand = spots[activeSpotIndex].subHands[activeSubHandIndex];
     if (bankroll < hand.bet) {
@@ -463,8 +580,10 @@ export default function App() {
     hand.bet *= 2;
     const drawnCard = shoeRef.current.draw();
     playSound('card');
-    shoeRef.current.visibleRunningCount += drawnCard.countValue;
+    if (!faceDown) shoeRef.current.visibleRunningCount += drawnCard.countValue;
     hand.cards.push(drawnCard);
+    hand.doubleCardFaceDown = faceDown;
+    hand.doubleCardPeeling = false;
     const total = calculateTotal(hand.cards);
     
     if (total > 21) {
@@ -473,10 +592,25 @@ export default function App() {
     } else {
       hand.status = 'stood';
     }
+    loggerRef.current.log(
+      faceDown ? 'DOUBLE_FACE_DOWN' : 'DOUBLE',
+      faceDown
+        ? `Spot ${activeSpotIndex + 1}, hand ${activeSubHandIndex + 1} doubled; card held face down.`
+        : `Spot ${activeSpotIndex + 1}, hand ${activeSubHandIndex + 1} doubled and drew ${formatCards([drawnCard])} for ${total}.`,
+      {
+        hand: activeSubHandIndex + 1,
+        playerCards: faceDown ? `${formatCards(hand.cards.slice(0, -1))} [face down]` : formatCards(hand.cards),
+        playerTotal: faceDown ? '' : total,
+        spot: activeSpotIndex + 1,
+        wager: hand.bet,
+      },
+    );
     advancePointer(
       spots,
       false,
-      `Player doubles and draws ${getSpokenCard(drawnCard)} for ${total}.`,
+      faceDown
+        ? 'Player doubles. Card face down.'
+        : `Player doubles and draws ${getSpokenCard(drawnCard)} for ${total}.`,
     );
   };
 
@@ -502,6 +636,15 @@ export default function App() {
 
     spot.subHands.splice(activeSubHandIndex, 1, ...splitHands);
     setPlayerSpots(spots);
+    loggerRef.current.log(
+      'SPLIT',
+      `Spot ${activeSpotIndex + 1} split into ${spot.subHands.length} hands.`,
+      {
+        playerCards: spot.subHands.map(split => formatCards(split.cards)).join(' | '),
+        spot: activeSpotIndex + 1,
+        wager: hand.bet,
+      },
+    );
 
     advancePointer(
       spots,
@@ -540,7 +683,10 @@ export default function App() {
     await announce(getDealerCardCall(dHand[1]));
 
     const dealerHasBlackjack = calculateTotal(dHand) === 21 && dHand.length === 2;
-    const needsDealerDraw = spots.some(spot => spot.subHands.some(h => h.status === 'stood' && !isNaturalBlackjack(h)));
+    const needsDealerDraw = spots.some(spot => spot.subHands.some(hand => (
+      hand.doubleCardFaceDown
+      || (hand.status === 'stood' && !isNaturalBlackjack(hand))
+    )));
 
     if (needsDealerDraw && !dealerHasBlackjack) {
       while (calculateTotal(dHand) < 17 || isSoft17(dHand)) {
@@ -553,7 +699,36 @@ export default function App() {
         await announce(getDealerCardCall(drawnCard));
       }
     }
-    resolveRound(dHand, spots, insBets, presetWinnings, totalWager);
+
+    let revealedSpots = spots;
+    const faceDownDoubles = spots.flatMap((spot, spotIndex) => (
+      spot.subHands.flatMap((hand, handIndex) => (
+        hand.doubleCardFaceDown ? [{ hand, handIndex, spotIndex }] : []
+      ))
+    ));
+    if (faceDownDoubles.length > 0) {
+      revealedSpots = spots.map(spot => ({
+        ...spot,
+        subHands: spot.subHands.map(hand => ({
+          ...hand,
+          doubleCardFaceDown: false,
+          doubleCardPeeling: Boolean(hand.doubleCardFaceDown),
+        })),
+      }));
+      faceDownDoubles.forEach(({ hand }) => {
+        const doubleCard = hand.cards[hand.cards.length - 1];
+        shoeRef.current.visibleRunningCount += doubleCard.countValue;
+      });
+      setPlayerSpots(revealedSpots);
+      playSound('card');
+      await new Promise(r => setTimeout(r, 950));
+      await announce(faceDownDoubles.map(({ hand, handIndex, spotIndex }) => {
+        const doubleCard = hand.cards[hand.cards.length - 1];
+        return `Spot ${spotIndex + 1}, hand ${handIndex + 1}, ${getSpokenCard(doubleCard)}. Total ${getSpokenHandTotal(hand.cards)}.`;
+      }));
+    }
+
+    resolveRound(dHand, revealedSpots, insBets, presetWinnings, totalWager);
   };
 
   const resolveRound = (dHand, spots, insBets, presetWinnings) => {
@@ -592,6 +767,7 @@ export default function App() {
       });
     });
 
+    logRoundResults(dHand, spots, insBets);
     setBankroll(b => b + totalReturn);
     setGameState('resolved');
     const outcomes = spots.flatMap(spot => spot.subHands.map(hand => hand.outcome));
@@ -610,37 +786,36 @@ export default function App() {
     );
   };
 
+  const executeRequestedAction = (actionType) => {
+    if (actionType === 'hit') return executeHit();
+    if (actionType === 'stand') return executeStand();
+    if (actionType === 'double') return executeDouble(false);
+    if (actionType === 'doubleFaceDown') return executeDouble(true);
+    if (actionType === 'split') return executeSplit();
+    return undefined;
+  };
+
   const handleAction = (actionType) => {
     const curHand = getCurrentActiveHand();
-    if (!warnStrategy) {
-      if (actionType === 'hit') return executeHit();
-      if (actionType === 'stand') return executeStand();
-      if (actionType === 'double') return executeDouble();
-      if (actionType === 'split') return executeSplit();
-    }
+    if (!warnStrategy) return executeRequestedAction(actionType);
 
     const evaluation = getDetailedPlay(curHand.cards, dealerHand[0], shoeRef.current.trueCount);
     let optimal = evaluation.action;
     if (optimal === 'double' && curHand.cards.length > 2) optimal = calculateTotal(curHand.cards) >= 18 ? 'stand' : 'hit';
+    const strategyAction = actionType === 'doubleFaceDown' ? 'double' : actionType;
     
-    if (actionType !== optimal) {
+    if (strategyAction !== optimal) {
       if (!showStrategyPopups) {
-        if (actionType === 'hit') executeHit();
-        else if (actionType === 'stand') executeStand();
-        else if (actionType === 'double') executeDouble();
-        else if (actionType === 'split') executeSplit();
+        executeRequestedAction(actionType);
       } else {
         setPendingAction({ intended: actionType, optimal, type: 'play', category: evaluation.type, rule: evaluation.rule });
         announce(
-          `${actionType} is not the recommended play. ${evaluation.type} recommends ${optimal}. Strategy decision pending.`,
+          `${actionType === 'doubleFaceDown' ? 'Face down double' : actionType} is not the recommended play. ${evaluation.type} recommends ${optimal}. Strategy decision pending.`,
           { listenAfter: true },
         );
       }
     } else {
-      if (actionType === 'hit') executeHit();
-      if (actionType === 'stand') executeStand();
-      if (actionType === 'double') executeDouble();
-      if (actionType === 'split') executeSplit();
+      executeRequestedAction(actionType);
     }
   };
 
@@ -650,10 +825,7 @@ export default function App() {
     const action = pendingAction;
     setPendingAction(null);
     if (proceed) {
-      if (action.intended === 'hit') executeHit();
-      else if (action.intended === 'stand') executeStand();
-      else if (action.intended === 'double') executeDouble();
-      else if (action.intended === 'split') executeSplit();
+      executeRequestedAction(action.intended);
     } else {
       announcePlayerTurn(
         playerSpots,
@@ -753,6 +925,11 @@ export default function App() {
     playSound('win');
   };
 
+  const triggerSickReaction = () => {
+    setSickReactionKey(current => current + 1);
+    playSound('loss');
+  };
+
   const stackBets = (dealImmediately = false) => {
     if (!['betting', 'resolved'].includes(gameState)) {
       announce('Stack it is available between rounds.', { listenAfter: true });
@@ -785,7 +962,7 @@ export default function App() {
 
     if (command.type === 'help') {
       announce(
-        'You can set one or two spots with separate wagers, deal, hit, stand, double, split, buy or decline insurance, take or decline even money, say run it, next, stack it, bang, toggle the count, dealer voice, or study guide, reload funds, or ask for a strategy tip, bankroll, or status.',
+        'You can set one or two spots with separate wagers, deal, hit, stand, face up double, face down double, split, buy or decline insurance, take or decline even money, say run it, next, stack it, bang, toggle the count, dealer voice, or study guide, reload funds, or ask for a strategy tip, bankroll, or status.',
         { listenAfter: true },
       );
       return;
@@ -876,6 +1053,10 @@ export default function App() {
       triggerCelebration();
       return;
     }
+    if (command.type === 'sickReaction') {
+      triggerSickReaction();
+      return;
+    }
     if (command.type === 'stackBet') {
       stackBets();
       return;
@@ -915,7 +1096,10 @@ export default function App() {
         announce(getVoiceSummary(), { listenAfter: true });
         return;
       }
-      if (command.action === 'double' && getCurrentActiveHand()?.cards.length !== 2) {
+      if (
+        ['double', 'doubleFaceDown'].includes(command.action)
+        && getCurrentActiveHand()?.cards.length !== 2
+      ) {
         announce('Double is not available after a hit.', { listenAfter: true });
       } else if (command.action === 'split' && !canSplitCurrent()) {
         announce('Split is not available for this hand.', { listenAfter: true });
@@ -1021,6 +1205,12 @@ export default function App() {
           8% { opacity: 1; }
           100% { opacity: 0; transform: translate3d(var(--confetti-drift), 108vh, 0) rotate(var(--confetti-rotation)) scale(1); }
         }
+        @keyframes sickReactionFall {
+          0% { opacity: 0; transform: translate3d(0, -14vh, 0) rotate(-12deg) scale(0.65); }
+          12% { opacity: 1; }
+          65% { opacity: 1; transform: translate3d(var(--sick-drift), 64vh, 0) rotate(10deg) scale(1.08); }
+          100% { opacity: 0; transform: translate3d(var(--sick-drift), 112vh, 0) rotate(-8deg) scale(0.92); }
+        }
       `}</style>
 
       {celebrationKey > 0 && (
@@ -1036,6 +1226,24 @@ export default function App() {
                 left: particle.left,
               }}
             />
+          ))}
+        </div>
+      )}
+
+      {sickReactionKey > 0 && (
+        <div key={sickReactionKey} className="sick-reaction" aria-hidden="true">
+          {SICK_REACTION_PARTICLES.map((particle, index) => (
+            <i
+              key={index}
+              style={{
+                '--sick-drift': particle.drift,
+                animationDelay: particle.delay,
+                fontSize: particle.size,
+                left: particle.left,
+              }}
+            >
+              {particle.emoji}
+            </i>
           ))}
         </div>
       )}
@@ -1255,13 +1463,27 @@ export default function App() {
                               {hand.outcome && <b>{hand.outcome}</b>}
                             </div>
                             <div className="hand-cards">
-                                {hand.cards.map((card, cIdx) => (
-                                  <PlayingCard key={cIdx} card={card} compact delay={cIdx * 70} />
-                                ))}
+                                {hand.cards.map((card, cIdx) => {
+                                  const isDoubleCard = hand.isDoubled && cIdx === hand.cards.length - 1;
+                                  return (
+                                    <PlayingCard
+                                      key={cIdx}
+                                      card={card}
+                                      compact
+                                      delay={cIdx * 70}
+                                      hidden={isDoubleCard && hand.doubleCardFaceDown}
+                                      peel={isDoubleCard && hand.doubleCardPeeling}
+                                    />
+                                  );
+                                })}
                             </div>
                             <div className="hand-total">
-                              <span>{isNaturalBJ ? 'Blackjack' : 'Total'}</span>
-                              <strong>{calculateTotal(hand.cards)}</strong>
+                              <span>
+                                {isNaturalBJ
+                                  ? 'Blackjack'
+                                  : hand.doubleCardFaceDown ? 'Double card down' : 'Total'}
+                              </span>
+                              <strong>{hand.doubleCardFaceDown ? '—' : calculateTotal(hand.cards)}</strong>
                               </div>
                             {renderChipStack(hand.bet, hand.outcome)}
                           </div>
