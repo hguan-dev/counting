@@ -1551,3 +1551,27 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+.confetti-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti-burst i {
+  position: absolute;
+  top: 0;
+  width: 10px;
+  height: 18px;
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.24);
+  animation: confettiFall 1450ms cubic-bezier(0.16, 0.7, 0.35, 1) both;
+}
+
+.confetti-burst i:nth-child(3n) {
+  width: 14px;
+  height: 8px;
+  border-radius: 999px;
+}

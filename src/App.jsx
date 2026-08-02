@@ -45,6 +45,14 @@ const isSoft17 = (cards) => {
   return hardSum === 7 && aces > 0;
 };
 
+const CONFETTI_PARTICLES = Array.from({ length: 42 }, (_, index) => ({
+  color: ['#facc15', '#fb7185', '#38bdf8', '#4ade80', '#c084fc', '#f97316'][index % 6],
+  delay: `${(index % 7) * 32}ms`,
+  drift: `${((index * 47) % 220) - 110}px`,
+  left: `${3 + ((index * 37) % 94)}%`,
+  rotation: `${180 + ((index * 83) % 540)}deg`,
+}));
+
 export default function App() {
   const shoeRef = useRef(new Shoe(6));
   const loggerRef = useRef(new GameLogger());
@@ -64,6 +72,7 @@ export default function App() {
   const [dealerHand, setDealerHand] = useState([]);
   const [showCount, setShowCount] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
+  const [celebrationKey, setCelebrationKey] = useState(0);
   const [insuranceBets, setInsuranceBets] = useState([]);
   const [evenMoneyQueue, setEvenMoneyQueue] = useState([]);
   
@@ -737,6 +746,31 @@ export default function App() {
     announce('Betting is open.', { listenAfter: true });
   };
 
+  const triggerCelebration = () => {
+    setCelebrationKey(current => current + 1);
+    playSound('win');
+  };
+
+  const stackBets = () => {
+    if (!['betting', 'resolved'].includes(gameState)) {
+      announce('Stack it is available between rounds.', { listenAfter: true });
+      return;
+    }
+
+    const activeBets = spotBets.slice(0, numHands);
+    if (activeBets.some(bet => bet * 2 > 10000)) {
+      announce('The table maximum is 10000 dollars per spot.', { listenAfter: true });
+      return;
+    }
+
+    const doubledBets = activeBets.map(bet => bet * 2);
+    setSpotBets(current => current.map((bet, index) => doubledBets[index] ?? bet));
+    const summary = doubledBets
+      .map((bet, index) => `spot ${index + 1}, ${bet} dollars`)
+      .join('; ');
+    announce(`Wagers doubled. ${summary}.`, { listenAfter: true });
+  };
+
   const handleVoiceCommand = (command) => {
     if (command?.type === 'unknown' || !command) {
       announce(`I did not recognize that command. ${getVoiceSummary()}`, { listenAfter: true });
@@ -745,7 +779,7 @@ export default function App() {
 
     if (command.type === 'help') {
       announce(
-        'You can set one or two spots with separate wagers, deal, hit, stand, double, split, buy or decline insurance, take or decline even money, start the next round, reload funds, ask for a strategy tip, the count, bankroll, or status.',
+        'You can set one or two spots with separate wagers, deal, hit, stand, double, split, buy or decline insurance, take or decline even money, say run it, next, stack it, bang, toggle the count, dealer voice, or study guide, reload funds, or ask for a strategy tip, bankroll, or status.',
         { listenAfter: true },
       );
       return;
@@ -783,15 +817,19 @@ export default function App() {
       return;
     }
     if (command.type === 'count') {
-      setShowCount(true);
-      announce(
-        getSpokenCountSummary(
-          shoeRef.current.visibleRunningCount,
-          shoeRef.current.trueCount,
-          shoeRef.current.decksRemaining,
-        ),
-        { listenAfter: true },
-      );
+      setShowCount(command.enabled);
+      if (command.enabled) {
+        announce(
+          getSpokenCountSummary(
+            shoeRef.current.visibleRunningCount,
+            shoeRef.current.trueCount,
+            shoeRef.current.decksRemaining,
+          ),
+          { listenAfter: true },
+        );
+      } else {
+        announce('Count display off.', { listenAfter: true });
+      }
       return;
     }
     if (command.type === 'sound') {
@@ -826,6 +864,19 @@ export default function App() {
     }
     if (command.type === 'reload') {
       addToBankroll(command.amount);
+      return;
+    }
+    if (command.type === 'celebrate') {
+      triggerCelebration();
+      return;
+    }
+    if (command.type === 'stackBet') {
+      stackBets();
+      return;
+    }
+    if (command.type === 'runIt') {
+      if (['betting', 'resolved'].includes(gameState)) deal();
+      else announce('Run it is available between rounds.', { listenAfter: true });
       return;
     }
 
@@ -955,7 +1006,29 @@ export default function App() {
           from { margin-top: -18px; opacity: 0; filter: brightness(1.35); }
           to { margin-top: 0; opacity: 1; filter: brightness(1); }
         }
+        @keyframes confettiFall {
+          0% { opacity: 0; transform: translate3d(0, -12vh, 0) rotate(0deg) scale(0.75); }
+          8% { opacity: 1; }
+          100% { opacity: 0; transform: translate3d(var(--confetti-drift), 108vh, 0) rotate(var(--confetti-rotation)) scale(1); }
+        }
       `}</style>
+
+      {celebrationKey > 0 && (
+        <div key={celebrationKey} className="confetti-burst" aria-hidden="true">
+          {CONFETTI_PARTICLES.map((particle, index) => (
+            <i
+              key={index}
+              style={{
+                '--confetti-drift': particle.drift,
+                '--confetti-rotation': particle.rotation,
+                animationDelay: particle.delay,
+                backgroundColor: particle.color,
+                left: particle.left,
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {showCheatSheet && <CheatSheet onClose={() => setShowCheatSheet(false)} />}
 

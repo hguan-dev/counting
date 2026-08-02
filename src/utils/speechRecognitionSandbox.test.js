@@ -18,6 +18,10 @@ const COMMAND_CASES = [
   ['take even money', { type: 'evenMoney', accept: true }],
   ['play it out', { type: 'evenMoney', accept: false }],
   ['next round', { type: 'nextRound' }],
+  ['next', { type: 'nextRound' }],
+  ['run it', { type: 'runIt' }],
+  ['stack it', { type: 'stackBet' }],
+  ['bang', { type: 'celebrate' }],
   ['two spots bet twenty five and fifty', {
     type: 'configureBets',
     spotCount: 2,
@@ -25,11 +29,14 @@ const COMMAND_CASES = [
   }],
   ['reload five hundred dollars', { type: 'reload', amount: 500 }],
   ['what is my bankroll', { type: 'bankroll' }],
-  ['what is the true count', { type: 'count' }],
+  ['what is the true count', { type: 'count', enabled: true }],
+  ['count off', { type: 'count', enabled: false }],
   ['microphone test', { type: 'micTest' }],
   ['sound off', { type: 'sound', enabled: false }],
   ['dealer voice on', { type: 'speech', enabled: true }],
+  ['dealer voice off', { type: 'speech', enabled: false }],
   ['open the study guide', { type: 'studyGuide', open: true }],
+  ['study guide off', { type: 'studyGuide', open: false }],
 ];
 
 const recognitionEvent = (transcripts, isFinal = true) => {

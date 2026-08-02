@@ -82,13 +82,21 @@ describe('table speech', () => {
     expect(parseVoiceCommand('play it out')).toEqual({ type: 'evenMoney', accept: false });
     expect(parseVoiceCommand('reload five hundred dollars')).toEqual({ type: 'reload', amount: 500 });
     expect(parseVoiceCommand('next round')).toEqual({ type: 'nextRound' });
-    expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count' });
+    expect(parseVoiceCommand('next')).toEqual({ type: 'nextRound' });
+    expect(parseVoiceCommand('run it')).toEqual({ type: 'runIt' });
+    expect(parseVoiceCommand('stack it')).toEqual({ type: 'stackBet' });
+    expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });
+    expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count', enabled: true });
+    expect(parseVoiceCommand('count off')).toEqual({ type: 'count', enabled: false });
     expect(parseVoiceCommand('dealer give me a tip')).toEqual({ type: 'tip' });
     expect(parseVoiceCommand("what's the move")).toEqual({ type: 'tip' });
     expect(parseVoiceCommand('what should I do')).toEqual({ type: 'tip' });
     expect(parseVoiceCommand('dealer voice off')).toEqual({ type: 'speech', enabled: false });
+    expect(parseVoiceCommand('dealer voice')).toEqual({ type: 'speech', enabled: true });
     expect(parseVoiceCommand('strategy guard on')).toEqual({ type: 'guard', enabled: true });
     expect(parseVoiceCommand('open the study guide')).toEqual({ type: 'studyGuide', open: true });
+    expect(parseVoiceCommand('study guide')).toEqual({ type: 'studyGuide', open: true });
+    expect(parseVoiceCommand('study guide off')).toEqual({ type: 'studyGuide', open: false });
     expect(parseVoiceCommand('microphone test')).toEqual({ type: 'micTest' });
   });
 
