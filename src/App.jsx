@@ -1,6 +1,12 @@
 import { useState, useRef } from 'react';
 import { Shoe } from './models/Shoe';
 import { calculateTotal, getDetailedPlay } from './utils/strategyEngine';
+import {
+  canSplitHand,
+  findNextPlayableHand,
+  isNaturalBlackjack,
+  splitHand,
+} from './utils/handRules';
 import { GameLogger } from './utils/logger';
 import CheatSheet from './components/CheatSheet';
 import PopupModal from './components/PopupModal';
@@ -92,7 +98,7 @@ export default function App() {
     const dealerTotal = calculateTotal([d1, d2]);
     const dealerHasBJ = dealerTotal === 21;
 
-    const hasPlayerBJ = spots.some(s => !s.subHands[0].isSplitHand && calculateTotal(s.subHands[0].cards) === 21);
+    const hasPlayerBJ = spots.some(s => isNaturalBlackjack(s.subHands[0]));
 
     if (isDealerAce) {
       setPlayerSpots(spots);
@@ -115,8 +121,7 @@ export default function App() {
       let netReturn = 0;
       spots.forEach((spot) => {
         spot.subHands.forEach((hand) => {
-          const pTotal = calculateTotal(hand.cards);
-          const isBJ = !hand.isSplitHand && hand.cards.length === 2 && pTotal === 21;
+          const isBJ = isNaturalBlackjack(hand);
           if (isBJ) {
             hand.outcome = 'push';
             netReturn += hand.bet;
@@ -132,8 +137,7 @@ export default function App() {
     let payoutReturn = 0;
     spots.forEach((spot, sIdx) => {
       const h = spot.subHands[0];
-      const pTotal = calculateTotal(h.cards);
-      const isBJ = !h.isSplitHand && handOrIsBlackjack(h.cards);
+      const isBJ = isNaturalBlackjack(h);
 
       if (isBJ) {
         h.outcome = 'win';
@@ -155,8 +159,6 @@ export default function App() {
       findFirstActiveHand(spots, 0, 0, payoutReturn, totalWager);
     }
   };
-
-  const handOrIsBlackjack = (cards) => cards.length === 2 && calculateTotal(cards) === 21;
 
   const findFirstActiveHand = (spots, sIdx, hIdx, runningReturn, totalWager) => {
     let found = false;
@@ -185,7 +187,7 @@ export default function App() {
 
     playerSpots.forEach((spot) => {
       spot.subHands.forEach((h) => {
-        const isBJ = !h.isSplitHand && handOrIsBlackjack(h.cards);
+        const isBJ = isNaturalBlackjack(h);
         if (isBJ) {
           if (accept) {
             h.outcome = 'win';
@@ -225,7 +227,7 @@ export default function App() {
       playerSpots.forEach((spot) => {
         spot.subHands.forEach((hand) => {
           hand.outcome = 'loss';
-          if (handOrIsBlackjack(hand.cards)) {
+          if (isNaturalBlackjack(hand)) {
             hand.outcome = 'push';
             netReturn += hand.bet;
           }
@@ -238,7 +240,7 @@ export default function App() {
       let winnings = 0;
       spots.forEach((spot) => {
         spot.subHands.forEach(h => {
-          if (handOrIsBlackjack(h.cards)) {
+          if (isNaturalBlackjack(h)) {
             h.outcome = 'win';
             winnings += h.bet + (h.bet * 1.5);
             h.status = 'stood';
@@ -307,35 +309,34 @@ export default function App() {
     if (bankroll < hand.bet) return alert("Insufficient funds to split!");
 
     setBankroll(b => b - hand.bet);
-    const isAces = hand.cards[0].value === 'A';
-    const card1 = shoeRef.current.draw();
-    const card2 = shoeRef.current.draw();
-    shoeRef.current.visibleRunningCount += card1.countValue + card2.countValue;
+    const drawnCards = [];
+    const splitHands = splitHand(hand, () => {
+      const card = shoeRef.current.draw();
+      drawnCards.push(card);
+      return card;
+    });
+    shoeRef.current.visibleRunningCount += drawnCards.reduce((sum, card) => sum + card.countValue, 0);
 
-    const sub1 = { cards: [hand.cards[0], card1], bet: hand.bet, status: isAces ? 'stood' : 'playing', outcome: null, isSplitAce: isAces, isSplitHand: true };
-    const sub2 = { cards: [hand.cards[1], card2], bet: hand.bet, status: isAces ? 'stood' : 'playing', outcome: null, isSplitAce: isAces, isSplitHand: true };
-    
-    spot.subHands.splice(activeSubHandIndex, 1, sub1, sub2);
+    spot.subHands.splice(activeSubHandIndex, 1, ...splitHands);
     setPlayerSpots(spots);
 
-    advancePointer(spots);
+    advancePointer(spots, true);
   };
 
-  const advancePointer = (spots) => {
+  const advancePointer = (spots, includeCurrent = false) => {
     setPlayerSpots(spots);
-    let sIdx = activeSpotIndex;
-    let hIdx = activeSubHandIndex;
+    const next = findNextPlayableHand(
+      spots,
+      activeSpotIndex,
+      activeSubHandIndex,
+      includeCurrent,
+    );
 
-    for (let s = sIdx; s < spots.length; s++) {
-      for (let h = (s === sIdx ? hIdx + 1 : 0); h < spots[s].subHands.length; h++) {
-        if (spots[s].subHands[h].status === 'playing') {
-          setActiveSpotIndex(s);
-          setActiveSubHandIndex(h);
-          setGameState('playing');
-          return;
-        }
-      }
-      hIdx = -1;
+    if (next) {
+      setActiveSpotIndex(next.spotIndex);
+      setActiveSubHandIndex(next.handIndex);
+      setGameState('playing');
+      return;
     }
 
     const totalWager = playerSpots.reduce((acc, s) => acc + s.subHands.reduce((a, h) => a + (h.isDoubled ? h.bet / 2 : h.bet), 0), 0) + insuranceBets.reduce((a, b) => a + b, 0);
@@ -350,7 +351,7 @@ export default function App() {
     await new Promise(r => setTimeout(r, 1000));
 
     const dealerHasBlackjack = calculateTotal(dHand) === 21 && dHand.length === 2;
-    const needsDealerDraw = spots.some(spot => spot.subHands.some(h => h.status === 'stood' && !handOrIsBlackjack(h.cards)));
+    const needsDealerDraw = spots.some(spot => spot.subHands.some(h => h.status === 'stood' && !isNaturalBlackjack(h)));
 
     if (needsDealerDraw && !dealerHasBlackjack) {
       while (calculateTotal(dHand) < 17 || isSoft17(dHand)) {
@@ -376,7 +377,7 @@ export default function App() {
     spots.forEach((spot) => {
       spot.subHands.forEach((hand) => {
         const pTotal = calculateTotal(hand.cards);
-        const isNaturalBJ = handOrIsBlackjack(hand.cards);
+        const isNaturalBJ = isNaturalBlackjack(hand);
         if (isNaturalBJ) {
           hand.outcome = 'win';
           return;
@@ -446,9 +447,7 @@ export default function App() {
   };
 
   const canSplitCurrent = () => {
-    const cur = getCurrentActiveHand();
-    if (!cur || cur.cards.length !== 2) return false;
-    return cur.cards[0].numericValue === cur.cards[1].numericValue;
+    return canSplitHand(getCurrentActiveHand());
   };
 
   const renderChipStack = (amount, outcome) => {
@@ -481,7 +480,7 @@ export default function App() {
   const getCardColor = (suit) => (suit === '♥' || suit === '♦') ? '#e74c3c' : '#111';
 
   return (
-    <div style={{ 
+    <main className="app-shell" style={{
       position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
       background: 'radial-gradient(circle at center, #0f4c20 0%, #072a12 70%, #031408 100%)', 
       color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', 
@@ -522,14 +521,14 @@ export default function App() {
       />
 
       {/* HEADER BAR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1.2rem' }}>
+      <div className="header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1.2rem' }}>
         <div style={{ display: 'flex', gap: '3rem', alignItems: 'baseline' }}>
           <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '400', color: '#f1c40f' }}>BLACKJACK</h1>
           <div style={{ display: 'flex', gap: '2rem', fontSize: '1.1rem' }}>
             <div><span style={{ opacity: 0.6 }}>Stack: </span><strong>${bankroll.toFixed(2)}</strong></div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="header-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <label style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
             <input type="checkbox" checked={warnStrategy} onChange={() => setWarnStrategy(!warnStrategy)} style={{ accentColor: '#2ecc71' }} /> Guard
           </label>
@@ -550,7 +549,7 @@ export default function App() {
       )}
 
       {/* GAME BOARD TABLE */}
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1, gap: '3rem' }}>
+      <div className="game-board" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1, gap: '3rem' }}>
         {gameState === 'shuffling' ? (
           <div style={{ color: '#f1c40f', fontSize: '2rem' }}>RESHUFFLING SHOE...</div>
         ) : (
@@ -581,7 +580,7 @@ export default function App() {
             {/* PLAYER SPOTS */}
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: '0.8rem' }}>Your Spots</div>
-              <div style={{ display: 'flex', gap: '3rem', justifyContent: 'center', minHeight: '130px' }}>
+              <div className="player-spots" style={{ display: 'flex', gap: '3rem', justifyContent: 'center', minHeight: '130px' }}>
                 {gameState === 'betting' ? (
                   <div style={{ border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '10px', padding: '1.5rem 3rem', opacity: '0.3' }}>CONFIGURE WAGER BELOW</div>
                 ) : (
@@ -589,7 +588,7 @@ export default function App() {
                     <div key={sIdx} style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
                       {spot.subHands.map((hand, hIdx) => {
                         const isActive = sIdx === activeSpotIndex && hIdx === activeSubHandIndex && gameState === 'playing';
-                        const isNaturalBJ = !hand.isSplitHand && handOrIsBlackjack(hand.cards);
+                        const isNaturalBJ = isNaturalBlackjack(hand);
                         return (
                           <div key={hIdx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                             <div style={{ 
@@ -597,7 +596,7 @@ export default function App() {
                               padding: '1rem', borderRadius: '12px', background: isActive ? 'rgba(46, 204, 113, 0.08)' : 'rgba(0,0,0,0.25)',
                               minWidth: '160px'
                             }}>
-                              <div style={{ display: 'flex', gap: '0.4ynth', justifyContent: 'center' }}>
+                              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
                                 {hand.cards.map((card, cIdx) => (
                                   <div key={cIdx} className="card-reveal" style={{ 
                                     background: '#fff', color: getCardColor(card.suit), 
@@ -647,7 +646,7 @@ export default function App() {
           onNextRound={() => setGameState('betting')}
         />
       )}
-    </div>
+    </main>
   );
 }
 
