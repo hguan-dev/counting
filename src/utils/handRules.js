@@ -7,6 +7,41 @@ export const isNaturalBlackjack = (hand) => (
   && calculateTotal(hand.cards) === 21
 );
 
+export const getEvenMoneyOffers = (spots) => (
+  spots.flatMap((spot, spotIndex) => (
+    spot.subHands
+      .map((hand, handIndex) => (
+        isNaturalBlackjack(hand) ? { spotIndex, handIndex } : null
+      ))
+      .filter(Boolean)
+  ))
+);
+
+export const applyEvenMoneyDecision = (spots, offer, accepted) => (
+  spots.map((spot, spotIndex) => ({
+    ...spot,
+    subHands: spot.subHands.map((hand, handIndex) => (
+      spotIndex === offer.spotIndex && handIndex === offer.handIndex
+        ? { ...hand, evenMoneyAccepted: accepted }
+        : hand
+    )),
+  }))
+);
+
+export const getNaturalBlackjackSettlement = (hand, dealerHasBlackjack) => {
+  if (!isNaturalBlackjack(hand)) return null;
+
+  if (hand.evenMoneyAccepted) {
+    return { outcome: 'win', returnAmount: hand.bet * 2 };
+  }
+
+  if (dealerHasBlackjack) {
+    return { outcome: 'push', returnAmount: hand.bet };
+  }
+
+  return { outcome: 'win', returnAmount: hand.bet * 2.5 };
+};
+
 export const canSplitHand = (hand) => (
   Boolean(hand)
   && hand.status === 'playing'

@@ -2,8 +2,11 @@ import { useState, useRef } from 'react';
 import { Shoe } from './models/Shoe';
 import { calculateTotal, getDetailedPlay } from './utils/strategyEngine';
 import {
+  applyEvenMoneyDecision,
   canSplitHand,
   findNextPlayableHand,
+  getEvenMoneyOffers,
+  getNaturalBlackjackSettlement,
   isNaturalBlackjack,
   splitHand,
 } from './utils/handRules';
@@ -48,7 +51,7 @@ export default function App() {
   const [showCount, setShowCount] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [insuranceBets, setInsuranceBets] = useState([]);
-  const [evenMoneyOffered, setEvenMoneyOffered] = useState(false);
+  const [evenMoneyQueue, setEvenMoneyQueue] = useState([]);
   
   const [warnStrategy, setWarnStrategy] = useState(true);
   const [showStrategyPopups, setShowStrategyPopups] = useState(true);
@@ -68,7 +71,7 @@ export default function App() {
     setBankroll(b => b - totalWager);
     loggerRef.current.log('DEAL', `Wagered $${initialBet} across ${numHands} spot(s). Total: $${totalWager}`);
     setInsuranceBets(new Array(numHands).fill(0));
-    setEvenMoneyOffered(false);
+    setEvenMoneyQueue([]);
     
     const d1 = shoeRef.current.draw();
     shoeRef.current.visibleRunningCount += d1.countValue;
@@ -99,12 +102,12 @@ export default function App() {
     const dealerTotal = calculateTotal([d1, d2]);
     const dealerHasBJ = dealerTotal === 21;
 
-    const hasPlayerBJ = spots.some(s => isNaturalBlackjack(s.subHands[0]));
+    const evenMoneyOffers = getEvenMoneyOffers(spots);
 
     if (isDealerAce) {
       setPlayerSpots(spots);
-      if (hasPlayerBJ) {
-        setEvenMoneyOffered(true);
+      if (evenMoneyOffers.length > 0) {
+        setEvenMoneyQueue(evenMoneyOffers);
         setGameState('evenMoney');
         return;
       }
@@ -169,6 +172,7 @@ export default function App() {
           setActiveSpotIndex(s);
           setActiveSubHandIndex(h);
           setGameState('playing');
+          if (runningReturn > 0) setBankroll(b => b + runningReturn);
           found = true;
           return;
         }
@@ -178,45 +182,44 @@ export default function App() {
   };
 
   const executeEvenMoney = async (accept) => {
-    setEvenMoneyOffered(false);
-    shoeRef.current.visibleRunningCount += dealerHand[1].countValue;
-    setGameState('dealerRevealing');
-    await new Promise(r => setTimeout(r, 800));
+    const [currentOffer, ...remainingOffers] = evenMoneyQueue;
+    if (!currentOffer) return;
 
-    const dealerHasBJ = calculateTotal(dealerHand) === 21;
-    let totalReturn = 0;
+    const spots = applyEvenMoneyDecision(playerSpots, currentOffer, accept);
+    setPlayerSpots(spots);
+    setEvenMoneyQueue(remainingOffers);
+    loggerRef.current.log(
+      'EVEN_MONEY',
+      `Spot ${currentOffer.spotIndex + 1} ${accept ? 'accepted' : 'declined'} even money.`,
+    );
 
-    playerSpots.forEach((spot) => {
-      spot.subHands.forEach((h) => {
-        const isBJ = isNaturalBlackjack(h);
-        if (isBJ) {
-          if (accept) {
-            h.outcome = 'win';
-            totalReturn += h.bet * 2; 
-          } else {
-            if (dealerHasBJ) {
-              h.outcome = 'push';
-              totalReturn += h.bet;
-            } else {
-              h.outcome = 'win';
-              totalReturn += h.bet + (h.bet * 1.5);
-            }
-          }
-        }
-      });
-    });
+    if (remainingOffers.length > 0) return;
 
-    setBankroll(b => b + totalReturn);
-    setGameState('resolved');
+    const hasInsuranceEligibleHand = spots.some(spot => (
+      spot.subHands.some(hand => !isNaturalBlackjack(hand))
+    ));
+    if (hasInsuranceEligibleHand) {
+      setGameState('insurance');
+      return;
+    }
+
+    await executeInsurance(false, spots);
   };
 
-  const executeInsurance = async (buy) => {
-    let insTotalCost = buy ? (initialBet / 2) * numHands : 0;
+  const executeInsurance = async (buy, spotsOverride = playerSpots) => {
+    const eligibleSpots = spotsOverride.map(spot => (
+      spot.subHands.some(hand => !isNaturalBlackjack(hand))
+    ));
+    const eligibleCount = eligibleSpots.filter(Boolean).length;
+    const insTotalCost = buy ? (initialBet / 2) * eligibleCount : 0;
     if (buy && bankroll < insTotalCost) return alert("Insufficient funds for insurance!");
     if (buy) setBankroll(b => b - insTotalCost);
-    setInsuranceBets(playerSpots.map(() => buy ? initialBet / 2 : 0));
+    const nextInsuranceBets = eligibleSpots.map(eligible => (
+      buy && eligible ? initialBet / 2 : 0
+    ));
+    setInsuranceBets(nextInsuranceBets);
 
-    const totalWager = initialBet * numHands + insTotalCost;
+    const totalWager = initialBet * spotsOverride.length + insTotalCost;
     const dealerHasBJ = calculateTotal(dealerHand) === 21;
 
     if (dealerHasBJ) {
@@ -225,31 +228,47 @@ export default function App() {
       await new Promise(r => setTimeout(r, 800));
 
       let netReturn = buy ? insTotalCost * 3 : 0;
-      playerSpots.forEach((spot) => {
+      const spots = spotsOverride.map(spot => ({
+        ...spot,
+        subHands: spot.subHands.map(hand => ({ ...hand })),
+      }));
+      spots.forEach((spot) => {
         spot.subHands.forEach((hand) => {
           hand.outcome = 'loss';
-          if (isNaturalBlackjack(hand)) {
-            hand.outcome = 'push';
-            netReturn += hand.bet;
+          const settlement = getNaturalBlackjackSettlement(hand, true);
+          if (settlement) {
+            hand.outcome = settlement.outcome;
+            hand.status = 'stood';
+            netReturn += settlement.returnAmount;
           }
         });
       });
+      setPlayerSpots(spots);
       setBankroll(b => b + netReturn);
       setGameState('resolved');
     } else {
-      let spots = JSON.parse(JSON.stringify(playerSpots));
+      const spots = JSON.parse(JSON.stringify(spotsOverride));
       let winnings = 0;
       spots.forEach((spot) => {
         spot.subHands.forEach(h => {
-          if (isNaturalBlackjack(h)) {
-            h.outcome = 'win';
-            winnings += h.bet + (h.bet * 1.5);
+          const settlement = getNaturalBlackjackSettlement(h, false);
+          if (settlement) {
+            h.outcome = settlement.outcome;
+            winnings += settlement.returnAmount;
             h.status = 'stood';
           }
         });
       });
       setPlayerSpots(spots);
-      findFirstActiveHand(spots, 0, 0, winnings, totalWager);
+      const next = findNextPlayableHand(spots, 0, 0, true);
+      if (next) {
+        if (winnings > 0) setBankroll(b => b + winnings);
+        setActiveSpotIndex(next.spotIndex);
+        setActiveSubHandIndex(next.handIndex);
+        setGameState('playing');
+      } else {
+        playDealerAndResolve(dealerHand, spots, nextInsuranceBets, winnings, totalWager);
+      }
     }
   };
 
@@ -555,11 +574,21 @@ export default function App() {
 
       {/* GAME BOARD TABLE */}
       <div className="game-board">
-        <div className="table-arc" aria-hidden="true">
-          <span>INSURANCE PAYS 2 TO 1</span>
-          <strong>BLACKJACK PAYS 3 TO 2</strong>
-          <span>DEALER MUST DRAW TO 16 AND HIT SOFT 17</span>
-        </div>
+        <svg className="table-rule-arc" viewBox="0 0 900 170" aria-hidden="true">
+          <defs>
+            <path id="table-rule-path" d="M 55 150 Q 450 -90 845 150" />
+          </defs>
+          <use href="#table-rule-path" className="table-rule-line" />
+          <text className="table-rule-copy table-rule-copy-left">
+            <textPath href="#table-rule-path" startOffset="19%" textAnchor="middle">INSURANCE PAYS 2 TO 1</textPath>
+          </text>
+          <text className="table-rule-copy table-rule-copy-center">
+            <textPath href="#table-rule-path" startOffset="50%" textAnchor="middle">BLACKJACK PAYS 3 TO 2</textPath>
+          </text>
+          <text className="table-rule-copy table-rule-copy-right">
+            <textPath href="#table-rule-path" startOffset="81%" textAnchor="middle">DEALER MUST HIT SOFT 17</textPath>
+          </text>
+        </svg>
         {gameState === 'shuffling' ? (
           <div className="shuffle-state"><span>♠</span> Reshuffling shoe…</div>
         ) : (
@@ -633,11 +662,15 @@ export default function App() {
       </div>
 
       {/* EVEN MONEY CONTROL OVERLAY OR CONTROLS */}
-      {evenMoneyOffered ? (
+      {evenMoneyQueue.length > 0 ? (
         <div className="decision-bar">
-          <span style={{ color: '#f1c40f', fontWeight: '500' }}>You have a Blackjack! Dealer shows an Ace. Take Even Money (1:1)?</span>
-          <button onClick={() => executeEvenMoney(true)} style={{ ...headerBtnStyle, background: '#f1c40f', color: '#000', fontWeight: '600' }}>Accept Even Money</button>
-          <button onClick={() => executeEvenMoney(false)} style={headerBtnStyle}>Decline (Play Out)</button>
+          <div className="decision-copy">
+            <span className="decision-kicker">Spot {evenMoneyQueue[0].spotIndex + 1} · Blackjack</span>
+            <strong>Take guaranteed even money?</strong>
+            <small>Dealer shows an Ace. This choice applies only to this hand.</small>
+          </div>
+          <button className="decision-button is-gold" onClick={() => executeEvenMoney(true)}>Take 1:1</button>
+          <button className="decision-button" onClick={() => executeEvenMoney(false)}>Play it out</button>
         </div>
       ) : (
         <GameControls
@@ -660,5 +693,3 @@ export default function App() {
     </main>
   );
 }
-
-const headerBtnStyle = { padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', borderRadius: '6px' };

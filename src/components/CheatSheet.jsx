@@ -29,6 +29,15 @@ const countRows = [
   ['10–A', '−1', 'High cards leaving the shoe favor the house'],
 ];
 
+const betRampRows = [
+  ['0 or lower', '1 unit', '$10'],
+  ['+1', '1 unit', '$10'],
+  ['+2', '2 units', '$20'],
+  ['+3', '4 units', '$40'],
+  ['+4', '6 units', '$60'],
+  ['+5 or higher', '8 units', '$80'],
+];
+
 function GuideTable({ rows, headings }) {
   return (
     <div className="guide-table-wrap">
@@ -200,6 +209,26 @@ export default function CheatSheet({ onClose }) {
             </section>
 
             <section>
+              <h3>Bet sizing: a practice ramp</h3>
+              <p className="section-intro">Choose one fixed unit before the shoe. A 1–8 spread means your largest wager is eight times your minimum—not eight times your last bet.</p>
+              <GuideTable rows={betRampRows} headings={['True count', 'Bet', '$10 unit example']} />
+              <div className="risk-note">
+                <strong>Size from bankroll, not emotion.</strong>
+                <span>With a $1,000 practice bankroll, a $5 unit creates 200 units; a $10 unit creates 100. More units reduce bet size and volatility, but no bankroll eliminates the risk of ruin.</span>
+              </div>
+            </section>
+
+            <section>
+              <h3>Using the ramp well</h3>
+              <ul className="guide-list">
+                <li>Raise or lower the wager from the <strong>true count before the deal</strong>, then leave it unchanged during the hand.</li>
+                <li>Keep the base unit fixed for the session. Never increase it to chase losses.</li>
+                <li>A worthwhile ramp depends on rules, penetration, accuracy, bankroll, and risk tolerance—not the count alone.</li>
+                <li>Reset the running count only when the shoe is shuffled.</li>
+              </ul>
+            </section>
+
+            <section>
               <h3>Practice loop</h3>
               <ol className="guide-list numbered">
                 <li>Start every fresh shoe at 0.</li>
@@ -212,7 +241,7 @@ export default function CheatSheet({ onClose }) {
 
             <details>
               <summary>Reality check</summary>
-              <p className="detail-copy">Card counting is not illegal in many jurisdictions, but casinos can refuse service. Rules vary by location. This trainer teaches arithmetic and decision-making, not guaranteed profit.</p>
+              <p className="detail-copy">This ramp is a learning example, not a promise of profit or individualized financial advice. Card counting is not illegal in many jurisdictions, but casinos can refuse service and local rules vary.</p>
             </details>
           </>
         )}
