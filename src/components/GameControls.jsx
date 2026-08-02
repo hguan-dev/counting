@@ -134,7 +134,24 @@ export default function GameControls({
         </div>
       )}
 
-      {(gameState === 'resolved' || gameState === 'dealerRevealing' || gameState === 'shuffling') && gameState !== 'insurance' && gameState !== 'playing' && gameState !== 'betting' && (
+      {gameState === 'resolved' && (
+        <div className="next-round-controls">
+          <div className="queued-wager" aria-label="Queued wager for next round">
+            <span>Next wager</span>
+            <strong>
+              {spotBets.slice(0, numHands).map((bet, index) => (
+                <b key={index}>Spot {index + 1} · ${bet}</b>
+              ))}
+            </strong>
+            <small>${spotBets.slice(0, numHands).reduce((sum, bet) => sum + bet, 0)} total</small>
+          </div>
+          <button className="next-round-button" onClick={onNextRound}>
+            Deal next round
+          </button>
+        </div>
+      )}
+
+      {(gameState === 'dealerRevealing' || gameState === 'shuffling') && (
         <button className="next-round-button" onClick={onNextRound} disabled={gameState === 'dealerRevealing' || gameState === 'shuffling'}>
           {gameState === 'shuffling' ? 'Shuffling shoe…' : gameState === 'dealerRevealing' ? 'Dealer revealing…' : 'Deal next round'}
         </button>

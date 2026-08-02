@@ -47,6 +47,7 @@ Useful conversational aliases include:
 - `run it`, `running it`, `Reddit`, `again`, `start`, or `go`: immediately deal the
   next round at the same wagers.
 - `next`: return to wager selection; `stack it up`: double the previous wager and deal.
+- `up it to 50` or `bet 50`: change the queued next-round wager without dealing.
 - `good`, `I'm good`, `stay`, or `Stan`: stand.
 - `face up` or `face down`: choose the corresponding double treatment.
 - `sorry` or `my bad`: dismiss a strategy warning and use the recommendation.

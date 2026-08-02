@@ -96,6 +96,16 @@ describe('table speech', () => {
     expect(parseVoiceCommand('again')).toEqual({ type: 'runIt' });
     expect(parseVoiceCommand('start')).toEqual({ type: 'runIt' });
     expect(parseVoiceCommand('go')).toEqual({ type: 'runIt' });
+    expect(parseVoiceCommand('up it to fifty')).toEqual({
+      type: 'configureBets',
+      spotCount: null,
+      bets: [50],
+    });
+    expect(parseVoiceCommand('bet seventy five')).toEqual({
+      type: 'configureBets',
+      spotCount: null,
+      bets: [75],
+    });
     expect(parseVoiceCommand('stack it')).toEqual({ type: 'stackBet' });
     expect(parseVoiceCommand('stack it up')).toEqual({ type: 'stackAndRun' });
     expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });

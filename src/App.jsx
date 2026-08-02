@@ -1014,7 +1014,11 @@ export default function App() {
     }
 
     if (gameState === 'resolved') {
-      return `${getRoundOutcomeSummary()}. Bankroll ${bankroll} dollars.`;
+      const queuedWagers = spotBets
+        .slice(0, numHands)
+        .map((bet, index) => `spot ${index + 1}, ${bet} dollars`)
+        .join('; ');
+      return `${getRoundOutcomeSummary()}. Bankroll ${bankroll} dollars. Next wager: ${queuedWagers}.`;
     }
 
     return gameState === 'shuffling'
@@ -1209,6 +1213,11 @@ export default function App() {
     if (command.type === 'runIt') {
       if (['betting', 'resolved'].includes(gameState)) deal();
       else announce('Run it is available between rounds.', { listenAfter: true });
+      return;
+    }
+
+    if (gameState === 'resolved' && command.type === 'configureBets') {
+      configureVoiceBets(command);
       return;
     }
 

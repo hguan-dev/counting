@@ -1332,6 +1332,56 @@ button:disabled {
   min-width: 210px;
 }
 
+.next-round-controls {
+  display: flex;
+  width: min(600px, 100%);
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.65rem;
+}
+
+.queued-wager {
+  display: grid;
+  min-width: 220px;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid rgba(232, 197, 106, 0.24);
+  border-radius: 10px;
+  background: rgba(4, 28, 18, 0.72);
+  align-content: center;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.7rem;
+}
+
+.queued-wager > span {
+  color: var(--gold);
+  font-size: 0.56rem;
+  font-weight: 850;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.queued-wager > strong {
+  display: flex;
+  grid-row: 1 / 3;
+  grid-column: 2;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.queued-wager > strong b {
+  color: var(--cream);
+  font-size: 0.77rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.queued-wager > small {
+  color: var(--muted);
+  font-size: 0.61rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .next-round-button:disabled {
   opacity: 0.5;
 }
@@ -1954,6 +2004,15 @@ button:disabled {
   }
 
   .reload-custom input {
+    width: 100%;
+  }
+
+  .next-round-controls {
+    flex-direction: column;
+  }
+
+  .queued-wager,
+  .next-round-button {
     width: 100%;
   }
 

@@ -163,6 +163,15 @@ export const parseVoiceCommand = (transcript) => {
     };
   }
 
+  const queuedBet = normalized.match(/^up\s+it\s+to\s+(.+)$/);
+  if (queuedBet) {
+    return {
+      type: 'configureBets',
+      spotCount: null,
+      bets: parseBetAmounts(queuedBet[1]),
+    };
+  }
+
   const betOnly = normalized.match(/\bbets?\b(?:\s+(?:is|to|of))?\s+(.+)$/);
   if (betOnly) {
     return { type: 'configureBets', spotCount: null, bets: parseBetAmounts(betOnly[1]) };

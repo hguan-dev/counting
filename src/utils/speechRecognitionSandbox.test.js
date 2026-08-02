@@ -30,6 +30,8 @@ const COMMAND_CASES = [
   ['again', { type: 'runIt' }],
   ['start', { type: 'runIt' }],
   ['go', { type: 'runIt' }],
+  ['up it to fifty', { type: 'configureBets', spotCount: null, bets: [50] }],
+  ['bet seventy five', { type: 'configureBets', spotCount: null, bets: [75] }],
   ['stack it', { type: 'stackBet' }],
   ['stack it up', { type: 'stackAndRun' }],
   ['bang', { type: 'celebrate' }],
