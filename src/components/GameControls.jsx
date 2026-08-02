@@ -15,12 +15,6 @@ export default function GameControls({
   hintedAction,
   onInsurance,
   onNextRound,
-  lastHeard,
-  onToggleVoiceInput,
-  voiceInputEnabled,
-  voiceError,
-  voiceStatus,
-  voiceSupported,
 }) {
   return (
     <div className="game-controls" aria-label="Game controls">
@@ -104,30 +98,6 @@ export default function GameControls({
               {hintedAction === 'split' && <small>Recommended</small>}
             </button>
           )}
-          <button
-            className={`voice-action ${voiceInputEnabled ? 'is-on' : ''} ${['starting', 'listening', 'hearing', 'processing'].includes(voiceStatus) ? 'is-listening' : ''}`}
-            onClick={onToggleVoiceInput}
-            disabled={!voiceSupported}
-            aria-pressed={voiceInputEnabled}
-          >
-            <span className="mic-icon" aria-hidden="true">●</span>
-            <span>
-              {voiceSupported
-                ? voiceStatus === 'blocked'
-                  ? 'Microphone blocked'
-                  : voiceStatus === 'error'
-                    ? 'Microphone needs attention'
-                    : voiceStatus === 'hearing'
-                      ? 'Hearing you…'
-                      : voiceStatus === 'processing'
-                        ? 'Matching command…'
-                        : ['starting', 'listening'].includes(voiceStatus)
-                    ? 'Listening…'
-                    : voiceInputEnabled ? 'Voice commands on' : 'Enable voice commands'
-                : 'Voice commands unavailable'}
-              <small>{voiceError || (lastHeard ? `Heard: “${lastHeard}”` : 'Say “microphone test” to check recognition')}</small>
-            </span>
-          </button>
         </div>
       )}
 

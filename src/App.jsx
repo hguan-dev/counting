@@ -24,6 +24,7 @@ import {
   getSpokenCountSummary,
   getSpokenHandTotal,
 } from './utils/tableSpeech';
+import { getKeyboardCommand } from './utils/keyboardShortcuts';
 
 const getChipColor = (denom) => {
   if (denom >= 1000) return '#f97316';
@@ -69,6 +70,7 @@ export default function App() {
   const shoeRef = useRef(new Shoe(6));
   const loggerRef = useRef(new GameLogger());
   const handleActionRef = useRef(null);
+  const keyboardActionRef = useRef(null);
   const voiceCommandRef = useRef(null);
   
   const [bankroll, setBankroll] = useState(1000);
@@ -1170,6 +1172,44 @@ export default function App() {
     }
   };
 
+  keyboardActionRef.current = (event) => {
+    if (
+      event.defaultPrevented
+      || event.repeat
+      || event.altKey
+      || event.ctrlKey
+      || event.metaKey
+      || event.target instanceof HTMLInputElement
+      || event.target instanceof HTMLSelectElement
+      || event.target instanceof HTMLTextAreaElement
+      || event.target?.isContentEditable
+    ) return;
+
+    const command = getKeyboardCommand(event.key, gameState);
+    if (!command) return;
+    event.preventDefault();
+
+    if (command.type === 'fullscreen') {
+      toggleFullscreen();
+    } else if (command.type === 'voiceMode') {
+      handleVoiceToggle();
+    } else if (command.type === 'action') {
+      if (command.action === 'double' && getCurrentActiveHand()?.cards.length !== 2) return;
+      if (command.action === 'split' && !canSplitCurrent()) return;
+      handleAction(command.action);
+    } else if (command.type === 'insurance') {
+      executeInsurance(command.buy);
+    } else if (command.type === 'evenMoney') {
+      executeEvenMoney(command.accept);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = event => keyboardActionRef.current?.(event);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const renderChipStack = (amount, outcome) => {
     let remaining = amount;
     const chips = [];
@@ -1347,127 +1387,139 @@ export default function App() {
           <small>+ Reload</small>
         </button>
         <div className="header-actions">
-          <label className="toggle-label">
-            <input type="checkbox" checked={warnStrategy} onChange={() => setWarnStrategy(!warnStrategy)} style={{ accentColor: '#2ecc71' }} /> Guard
-          </label>
-          <label className="toggle-label">
-            <input type="checkbox" checked={showStrategyPopups} onChange={() => setShowStrategyPopups(!showStrategyPopups)} style={{ accentColor: '#3498db' }} /> Popups
-          </label>
-          <button className="topbar-button is-featured" onClick={() => setShowCheatSheet(true)}>Study Guide</button>
-          <button className="topbar-button" onClick={() => setShowCount(!showCount)}>{showCount ? "Hide Count" : "Peek Count"}</button>
-          <button
-            className={`topbar-button header-icon-button ${soundEnabled ? 'is-on' : ''}`}
-            onClick={() => setSoundEnabled(current => !current)}
-            aria-label={soundEnabled ? 'Turn sound off' : 'Turn sound on'}
-            aria-pressed={soundEnabled}
-            title={soundEnabled ? 'Sound on' : 'Sound off'}
-          >
-            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 9v6h4l5 4V5L8 9H4Z" />
-              {soundEnabled
-                ? <path d="M16 8.2a5 5 0 0 1 0 7.6M18.7 5.8a8.2 8.2 0 0 1 0 12.4" />
-                : <path d="m16 9 5 6m0-6-5 6" />}
-            </svg>
-            <span className="sr-only">{soundEnabled ? 'Sound on' : 'Sound off'}</span>
-          </button>
-          <button
-            className={`topbar-button header-icon-button ${speechEnabled ? 'is-on' : ''}`}
-            onClick={() => setSpeechEnabled(current => !current)}
-            aria-label={speechEnabled ? 'Turn dealer voice off' : 'Turn dealer voice on'}
-            aria-pressed={speechEnabled}
-            title={speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}
-          >
-            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 5h16v12H9l-5 3V5Z" />
-              <path d="M8 11h1m2.5 0h1m2.5 0h1" />
-              {!speechEnabled && <path d="M3 3 21 21" />}
-            </svg>
-            <span className="sr-only">{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</span>
-          </button>
-          <button
-            className={`topbar-button header-icon-button ${isFullscreen ? 'is-on' : ''}`}
-            onClick={() => toggleFullscreen()}
-            aria-pressed={isFullscreen}
-            aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
-            title={isFullscreen ? 'Exit full screen' : 'Full screen'}
-          >
-            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5" />
-            </svg>
-            <span className="sr-only">{isFullscreen ? 'Exit full screen' : 'Full screen'}</span>
-          </button>
-          {kokoroVoices.length > 0 && (
-            <label className="voice-picker">
-              <span>
-                {voiceModelStatus === 'loading'
-                  ? `Loading AI voice${voiceModelProgress ? ` ${voiceModelProgress}%` : '…'}`
-                  : voiceModelStatus === 'warming' ? 'AI voice retrying' : 'AI voice ready'}
-              </span>
-              <select
-                aria-label="Dealer voice"
-                value={selectedVoiceName}
-                onChange={event => setSelectedVoiceName(event.target.value)}
-              >
-                <optgroup label="Kokoro studio voices">
-                  {kokoroVoices.map(voice => (
-                    <option key={voice.id} value={`kokoro:${voice.id}`}>
-                      {voice.label}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
+          <div className="header-utility-row">
+            <label className="toggle-label">
+              <input type="checkbox" checked={warnStrategy} onChange={() => setWarnStrategy(!warnStrategy)} style={{ accentColor: '#2ecc71' }} /> Guard
             </label>
-          )}
-          <button
-            className={`topbar-button voice-toggle ${voiceInputEnabled ? 'is-on' : ''} ${['starting', 'listening', 'hearing', 'processing'].includes(voiceStatus) ? 'is-listening' : ''}`}
-            onClick={handleVoiceToggle}
-            disabled={!voiceSupported}
-            aria-pressed={voiceInputEnabled}
-          >
-            {voiceSupported
-              ? voiceStatus === 'blocked'
-                ? 'Mic blocked'
-                : voiceStatus === 'hearing'
-                  ? 'Hearing you…'
-                  : voiceStatus === 'processing'
-                    ? 'Processing…'
-                    : ['starting', 'listening'].includes(voiceStatus)
-                      ? 'Listening…'
-                      : voiceInputEnabled ? 'Voice mode on' : 'Voice mode'
-              : 'Voice unavailable'}
-          </button>
-          <button
-            className="topbar-button header-icon-button"
-            onClick={() => loggerRef.current.downloadCSV()}
-            aria-label="Export session log"
-            title="Export session log"
-          >
-            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4" />
-            </svg>
-            <span className="sr-only">Export session log</span>
-          </button>
+            <label className="toggle-label">
+              <input type="checkbox" checked={showStrategyPopups} onChange={() => setShowStrategyPopups(!showStrategyPopups)} style={{ accentColor: '#3498db' }} /> Popups
+            </label>
+            <button className="topbar-button is-featured" onClick={() => setShowCheatSheet(true)}>Guide</button>
+            <button
+              className={`topbar-button ${showCount ? 'is-on' : ''}`}
+              onClick={() => setShowCount(!showCount)}
+              aria-pressed={showCount}
+            >
+              Count
+            </button>
+            <button
+              className="topbar-button header-icon-button"
+              onClick={() => loggerRef.current.downloadCSV()}
+              aria-label="Export session log"
+              title="Export session log"
+            >
+              <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4" />
+              </svg>
+              <span className="sr-only">Export session log</span>
+            </button>
+            <button
+              className={`topbar-button header-icon-button ${isFullscreen ? 'is-on' : ''}`}
+              onClick={() => toggleFullscreen()}
+              aria-pressed={isFullscreen}
+              aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+              title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+            >
+              <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5" />
+              </svg>
+              <span className="sr-only">{isFullscreen ? 'Exit full screen' : 'Full screen'}</span>
+            </button>
+          </div>
+          <div className="header-voice-row">
+            <button
+              className={`topbar-button header-icon-button ${soundEnabled ? 'is-on' : ''}`}
+              onClick={() => setSoundEnabled(current => !current)}
+              aria-label={soundEnabled ? 'Turn sound off' : 'Turn sound on'}
+              aria-pressed={soundEnabled}
+              title={soundEnabled ? 'Sound on' : 'Sound off'}
+            >
+              <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+                {soundEnabled
+                  ? <path d="M16 8.2a5 5 0 0 1 0 7.6M18.7 5.8a8.2 8.2 0 0 1 0 12.4" />
+                  : <path d="m16 9 5 6m0-6-5 6" />}
+              </svg>
+              <span className="sr-only">{soundEnabled ? 'Sound on' : 'Sound off'}</span>
+            </button>
+            <button
+              className={`topbar-button header-icon-button ${speechEnabled ? 'is-on' : ''}`}
+              onClick={() => setSpeechEnabled(current => !current)}
+              aria-label={speechEnabled ? 'Turn dealer voice off' : 'Turn dealer voice on'}
+              aria-pressed={speechEnabled}
+              title={speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}
+            >
+              <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h16v12H9l-5 3V5Z" />
+                <path d="M8 11h1m2.5 0h1m2.5 0h1" />
+                {!speechEnabled && <path d="M3 3 21 21" />}
+              </svg>
+              <span className="sr-only">{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</span>
+            </button>
+            {kokoroVoices.length > 0 && (
+              <label className="voice-picker">
+                <span>
+                  {voiceModelStatus === 'loading'
+                    ? `Loading AI voice${voiceModelProgress ? ` ${voiceModelProgress}%` : '…'}`
+                    : voiceModelStatus === 'warming' ? 'AI voice retrying' : 'AI voice ready'}
+                </span>
+                <select
+                  aria-label="Dealer voice"
+                  value={selectedVoiceName}
+                  onChange={event => setSelectedVoiceName(event.target.value)}
+                >
+                  <optgroup label="Kokoro studio voices">
+                    {kokoroVoices.map(voice => (
+                      <option key={voice.id} value={`kokoro:${voice.id}`}>
+                        {voice.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </label>
+            )}
+            <button
+              className={`topbar-button voice-toggle ${voiceInputEnabled ? 'is-on' : ''} ${['starting', 'listening', 'hearing', 'processing'].includes(voiceStatus) ? 'is-listening' : ''}`}
+              onClick={handleVoiceToggle}
+              disabled={!voiceSupported}
+              aria-pressed={voiceInputEnabled}
+            >
+              {voiceSupported
+                ? voiceStatus === 'blocked'
+                  ? 'Mic blocked'
+                  : voiceStatus === 'hearing'
+                    ? 'Hearing you…'
+                    : voiceStatus === 'processing'
+                      ? 'Processing…'
+                      : ['starting', 'listening'].includes(voiceStatus)
+                        ? 'Listening…'
+                        : voiceInputEnabled ? 'Voice mode on' : 'Voice mode'
+                : 'Voice unavailable'}
+            </button>
+          </div>
         </div>
       </div>
 
       {voiceInputEnabled && (
-        <div className={`voice-diagnostic is-${voiceStatus}`} role="status" aria-live="polite">
-          <span className="voice-level" aria-hidden="true"><i /><i /><i /></span>
-          <strong>
-            {voiceStatus === 'hearing'
-              ? 'Speech detected'
-              : voiceStatus === 'processing'
-                ? 'Matching command'
-                : voiceStatus === 'blocked'
-                  ? 'Microphone blocked'
-                  : voiceStatus === 'error'
-                    ? 'Microphone needs attention'
-                    : 'Microphone listening'}
-          </strong>
-          <span>
-            {voiceError
-              || (lastHeard ? `Latest transcript: “${lastHeard}”` : 'Say “microphone test” to verify the full recognition path.')}
-          </span>
+        <div className="floating-voice-mode">
+          <div className={`voice-diagnostic is-${voiceStatus}`} role="status" aria-live="polite">
+            <span className="voice-level" aria-hidden="true"><i /><i /><i /></span>
+            <strong>
+              {voiceStatus === 'hearing'
+                ? 'Speech detected'
+                : voiceStatus === 'processing'
+                  ? 'Matching command'
+                  : voiceStatus === 'blocked'
+                    ? 'Microphone blocked'
+                    : voiceStatus === 'error'
+                      ? 'Microphone needs attention'
+                      : 'Microphone listening'}
+            </strong>
+            <span>
+              {voiceError
+                || (lastHeard ? `Latest transcript: “${lastHeard}”` : 'Say “microphone test” to verify the full recognition path.')}
+            </span>
+          </div>
         </div>
       )}
 
@@ -1641,12 +1693,6 @@ export default function App() {
           hintedAction={hintedAction}
           onInsurance={executeInsurance}
           onNextRound={beginNextRound}
-          lastHeard={lastHeard}
-          onToggleVoiceInput={handleVoiceToggle}
-          voiceInputEnabled={voiceInputEnabled}
-          voiceError={voiceError}
-          voiceStatus={voiceStatus}
-          voiceSupported={voiceSupported}
         />
       )}
     </main>

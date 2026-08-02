@@ -173,12 +173,24 @@ button:disabled {
 }
 
 .header-actions {
+  display: grid;
+  min-width: 0;
+  gap: 0.42rem;
+  justify-items: end;
+}
+
+.header-utility-row,
+.header-voice-row {
   display: flex;
+  width: 100%;
   min-width: 0;
   align-items: center;
   justify-content: flex-end;
   gap: 0.48rem;
-  flex-wrap: wrap;
+}
+
+.header-voice-row {
+  min-height: 36px;
 }
 
 .toggle-label {
@@ -275,9 +287,9 @@ button:disabled {
 
 .voice-diagnostic {
   display: flex;
-  width: min(760px, 100%);
+  width: 100%;
   min-height: 42px;
-  margin: 0.55rem auto 0;
+  margin: 0;
   padding: 0.55rem 0.75rem;
   border: 1px solid rgba(110, 231, 153, 0.3);
   border-radius: 11px;
@@ -286,6 +298,22 @@ button:disabled {
   gap: 0.65rem;
   color: var(--muted);
   font-size: 0.74rem;
+}
+
+.floating-voice-mode {
+  position: fixed;
+  z-index: 120;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: flex;
+  width: min(380px, calc(100vw - 2rem));
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.floating-voice-mode .voice-diagnostic {
+  pointer-events: auto;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
 }
 
 .voice-diagnostic strong {
@@ -981,35 +1009,6 @@ button:disabled {
   }
 }
 
-.voice-action {
-  display: flex;
-  min-height: 42px;
-  padding: 0.45rem 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 9px;
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--muted);
-  align-items: center;
-  justify-content: center;
-  flex: 1 1 100%;
-  gap: 0.55rem;
-  font-size: 0.69rem;
-  font-weight: 800;
-}
-
-.voice-action > span:last-child {
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-
-.voice-action small {
-  margin-top: 0.08rem;
-  font-size: 0.58rem;
-  font-weight: 650;
-  opacity: 0.68;
-}
-
 .mic-icon {
   display: grid;
   width: 23px;
@@ -1019,19 +1018,6 @@ button:disabled {
   color: rgba(255, 255, 255, 0.38);
   font-size: 0.45rem;
   place-items: center;
-}
-
-.voice-action.is-on {
-  border-color: rgba(110, 231, 153, 0.34);
-  color: #b7f2cc;
-}
-
-.voice-action.is-on .mic-icon {
-  color: #6ee799;
-}
-
-.voice-action.is-listening .mic-icon {
-  animation: microphonePulse 900ms ease-in-out infinite alternate;
 }
 
 .insurance-controls {
@@ -1400,7 +1386,7 @@ button:disabled {
 
   .header-actions {
     grid-column: 1 / -1;
-    justify-content: flex-start;
+    justify-items: end;
   }
 
   .app-shell {
@@ -1449,11 +1435,16 @@ button:disabled {
   .header-actions {
     width: 100%;
     gap: 0.45rem !important;
-    flex-wrap: wrap;
   }
 
-  .toggle-label {
-    order: 2;
+  .header-utility-row,
+  .header-voice-row {
+    gap: 0.4rem;
+  }
+
+  .header-voice-row {
+    display: grid;
+    grid-template-columns: 38px 38px minmax(0, 1fr) auto;
   }
 
   .topbar-button {
@@ -1465,11 +1456,15 @@ button:disabled {
   }
 
   .voice-picker {
-    flex: 1 1 190px;
+    min-width: 0;
   }
 
   .voice-picker select {
     width: 100%;
+  }
+
+  .voice-picker > span {
+    display: none;
   }
 
   .count-panel {
@@ -1479,6 +1474,12 @@ button:disabled {
   .voice-diagnostic {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .floating-voice-mode {
+    left: max(0.75rem, env(safe-area-inset-left));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    width: min(340px, calc(100vw - 1.5rem));
   }
 
   .reload-panel {
