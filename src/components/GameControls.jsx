@@ -21,14 +21,23 @@ export default function GameControls({
   return (
     <div className="game-controls" aria-label="Game controls">
       {gameState === 'betting' && (
-        <div className="betting-controls">
-          <label className="control-field" htmlFor="spots">
-            <span>Player spots</span>
-            <select id="spots" aria-label="Number of spots" value={numHands} onChange={(e) => setNumHands(Number(e.target.value))}>
-              <option value={1}>1 spot</option>
-              <option value={2}>2 spots</option>
-            </select>
-          </label>
+        <div className={`betting-controls has-${numHands}-spots`}>
+          <fieldset className="control-field spot-selector">
+            <legend>Player spots</legend>
+            <div className="spot-options">
+              {[1, 2].map(count => (
+                <button
+                  key={count}
+                  type="button"
+                  className={numHands === count ? 'is-selected' : ''}
+                  aria-pressed={numHands === count}
+                  onClick={() => setNumHands(count)}
+                >
+                  {count} {count === 1 ? 'spot' : 'spots'}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           {Array.from({ length: numHands }, (_, spotIndex) => (
             <label className="control-field" htmlFor={`wager-${spotIndex + 1}`} key={spotIndex}>
               <span>Spot {spotIndex + 1} wager</span>

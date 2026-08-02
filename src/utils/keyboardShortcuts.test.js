@@ -17,6 +17,10 @@ describe('getKeyboardCommand', () => {
     expect(getKeyboardCommand('F', 'betting')).toEqual({ type: 'fullscreen' });
   });
 
+  it('maps C to the count display from any game state', () => {
+    expect(getKeyboardCommand('c', 'playing')).toEqual({ type: 'countToggle' });
+  });
+
   it('maps V to voice mode from any game state', () => {
     expect(getKeyboardCommand('v', 'resolved')).toEqual({ type: 'voiceMode' });
   });

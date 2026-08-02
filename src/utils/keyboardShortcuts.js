@@ -9,6 +9,7 @@ const PLAYING_SHORTCUTS = {
 export const getKeyboardCommand = (key, gameState) => {
   const normalizedKey = key.toLowerCase();
 
+  if (normalizedKey === 'c') return { type: 'countToggle' };
   if (normalizedKey === 'f') return { type: 'fullscreen' };
   if (normalizedKey === 'v') return { type: 'voiceMode' };
   if (gameState === 'playing' && PLAYING_SHORTCUTS[normalizedKey]) {

@@ -1126,7 +1126,10 @@ export default function App() {
       triggerSickReaction();
       return;
     }
-    if (command.type === 'fullscreen') {
+    if (command.type === 'countToggle') {
+      setShowCount(current => !current);
+      return;
+    } else if (command.type === 'fullscreen') {
       toggleFullscreen(command.enabled);
       return;
     }
@@ -1233,7 +1236,9 @@ export default function App() {
     if (!command) return;
     event.preventDefault();
 
-    if (command.type === 'fullscreen') {
+    if (command.type === 'countToggle') {
+      setShowCount(current => !current);
+    } else if (command.type === 'fullscreen') {
       toggleFullscreen();
     } else if (command.type === 'voiceMode') {
       handleVoiceToggle();
