@@ -1,63 +1,226 @@
-export default function CheatSheet({ onClose }) {
+import { useState } from 'react';
+
+const strategyRows = [
+  ['Hard 17+', 'Stand'],
+  ['Hard 13–16', 'Stand vs 2–6; hit vs 7–A'],
+  ['Hard 12', 'Stand vs 4–6; otherwise hit'],
+  ['Hard 11', 'Double; hit if doubling unavailable'],
+  ['Hard 10', 'Double vs 2–9; otherwise hit'],
+  ['Hard 9', 'Double vs 3–6; otherwise hit'],
+  ['Soft 19+', 'Stand'],
+  ['Soft 18 (A,7)', 'Double vs 3–6; stand vs 2,7,8; hit vs 9–A'],
+  ['Soft 13–17', 'Double against select 3–6 upcards; otherwise hit'],
+];
+
+const pairRows = [
+  ['A,A / 8,8', 'Always split'],
+  ['10,10', 'Never split; stand'],
+  ['9,9', 'Split vs 2–6, 8, 9'],
+  ['7,7', 'Split vs 2–7'],
+  ['6,6', 'Split vs 2–6'],
+  ['5,5', 'Never split; play as hard 10'],
+  ['4,4', 'Split vs 5–6'],
+  ['2,2 / 3,3', 'Split vs 2–7'],
+];
+
+const countRows = [
+  ['2–6', '+1', 'Low cards leaving the shoe favor the player'],
+  ['7–9', '0', 'Neutral'],
+  ['10–A', '−1', 'High cards leaving the shoe favor the house'],
+];
+
+function GuideTable({ rows, headings }) {
   return (
-    <div style={{
-      position: 'fixed', right: 0, top: 0, width: '420px', height: '100vh', 
-      background: 'rgba(15, 15, 15, 0.96)', backdropFilter: 'blur(12px)', borderLeft: '1px solid rgba(255,255,255,0.1)', 
-      padding: '2rem', overflowY: 'auto', zIndex: 3000, boxShadow: '-15px 0 40px rgba(0,0,0,0.8)', color: '#e0e0e0',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
-        <h3 style={{ margin: 0, color: '#f1c40f', letterSpacing: '1px' }}>BASIC STRATEGY GUIDE</h3>
-        <button onClick={onClose} style={{ background: 'transparent', color: '#fff', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
-      </div>
-
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h4 style={{ color: '#2ecc71', fontSize: '0.95rem', marginBottom: '0.5rem' }}>Hard Totals</h4>
-        <ul style={{ fontSize: '0.85rem', lineHeight: '1.6', paddingLeft: '1.2rem', opacity: 0.9 }}>
-          <li><strong>17+:</strong> Always Stand</li>
-          <li><strong>13–16:</strong> Stand vs. Dealer 2–6, otherwise Hit</li>
-          <li><strong>12:</strong> Stand vs. Dealer 4–6, otherwise Hit</li>
-          <li><strong>11:</strong> Always Double (else Hit if &gt;2 cards)</li>
-          <li><strong>10:</strong> Double vs. Dealer 2–9 (else Hit)</li>
-          <li><strong>9:</strong> Double vs. Dealer 3–6 (else Hit)</li>
-          <li><strong>5–8:</strong> Always Hit</li>
-        </ul>
-      </div>
-
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h4 style={{ color: '#3498db', fontSize: '0.95rem', marginBottom: '0.5rem' }}>Soft Totals</h4>
-        <ul style={{ fontSize: '0.85rem', lineHeight: '1.6', paddingLeft: '1.2rem', opacity: 0.9 }}>
-          <li><strong>19–20 (A,8 / A,9):</strong> Always Stand</li>
-          <li><strong>18 (A,7):</strong> Double vs. 3–6, Stand vs. 2,7,8, Hit vs. 9,10,A</li>
-          <li><strong>17 (A,6):</strong> Double vs. 3–6, otherwise Hit</li>
-          <li><strong>15–16 (A,4 / A,5):</strong> Double vs. 4–6, otherwise Hit</li>
-          <li><strong>13–14 (A,2 / A,3):</strong> Double vs. 5–6, otherwise Hit</li>
-        </ul>
-      </div>
-
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h4 style={{ color: '#e74c3c', fontSize: '0.95rem', marginBottom: '0.5rem' }}>Pairs</h4>
-        <ul style={{ fontSize: '0.85rem', lineHeight: '1.6', paddingLeft: '1.2rem', opacity: 0.9 }}>
-          <li><strong>A,A & 8,8:</strong> Always Split</li>
-          <li><strong>10,10:</strong> Never Split (Stand)</li>
-          <li><strong>9,9:</strong> Split vs. 2–6, 8, 9 (Stand vs. 7, 10, A)</li>
-          <li><strong>7,7 & 2,2 & 3,3:</strong> Split vs. Dealer 2–7</li>
-          <li><strong>6,6:</strong> Split vs. Dealer 2–6</li>
-          <li><strong>5,5:</strong> Double like hard 10</li>
-          <li><strong>4,4:</strong> Split vs. 5–6</li>
-        </ul>
-      </div>
-
-      <div>
-        <h4 style={{ color: '#f1c40f', fontSize: '0.95rem', marginBottom: '0.5rem' }}>Illustrious 18 Deviations</h4>
-        <p style={{ fontSize: '0.85rem', lineHeight: '1.6', opacity: 0.85 }}>
-          • Insurance at True Count ≥ +3<br/>
-          • 16 vs. 10 at True Count ≥ 0 (Stand)<br/>
-          • 15 vs. 10 at True Count ≥ +4 (Stand)<br/>
-          • 11 vs. Ace at True Count ≥ +1 (Double)<br/>
-          • 10 vs. 10 at True Count ≥ +4 (Double)
-        </p>
-      </div>
+    <div className="guide-table-wrap">
+      <table className="guide-table">
+        <thead>
+          <tr>{headings.map(heading => <th key={heading}>{heading}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row[0]}>
+              {row.map((cell, index) => <td key={`${row[0]}-${index}`}>{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+  );
+}
+
+export default function CheatSheet({ onClose }) {
+  const [activeTab, setActiveTab] = useState('strategy');
+  const tabs = [
+    ['strategy', 'Strategy'],
+    ['rules', 'How to play'],
+    ['counting', 'Counting'],
+  ];
+
+  return (
+    <aside className="study-drawer" aria-label="Blackjack study guide">
+      <div className="study-header">
+        <div>
+          <span className="eyebrow">Table school</span>
+          <h2>Blackjack Study Guide</h2>
+        </div>
+        <button className="icon-button" onClick={onClose} aria-label="Close study guide">✕</button>
+      </div>
+
+      <div className="study-tabs" role="tablist" aria-label="Study guide sections">
+        {tabs.map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={activeTab === id}
+            className={activeTab === id ? 'is-active' : ''}
+            onClick={() => setActiveTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="study-content">
+        {activeTab === 'strategy' && (
+          <>
+            <section className="guide-callout">
+              <span className="guide-callout-icon">★</span>
+              <div>
+                <strong>Basic strategy is math, not instinct.</strong>
+                <p>It minimizes the house edge for the exact rules shown at the table. It does not guarantee any single hand.</p>
+              </div>
+            </section>
+
+            <section>
+              <h3>Hard & soft totals</h3>
+              <p className="section-intro">A soft hand contains an Ace currently counted as 11. A hard hand does not.</p>
+              <GuideTable rows={strategyRows} headings={['Your hand', 'Best play']} />
+            </section>
+
+            <section>
+              <h3>Pairs</h3>
+              <GuideTable rows={pairRows} headings={['Pair', 'Best play']} />
+            </section>
+
+            <details>
+              <summary>Key count deviations in this trainer</summary>
+              <ul className="guide-list">
+                <li><strong>Insurance:</strong> take at true count +3 or higher.</li>
+                <li><strong>16 vs 10:</strong> stand at true count 0 or higher, except always split 8s.</li>
+                <li><strong>15 vs 10:</strong> stand at true count +4 or higher.</li>
+                <li><strong>10 vs 10:</strong> double at true count +4 or higher.</li>
+                <li><strong>11 vs Ace:</strong> double at true count +1 or higher.</li>
+              </ul>
+            </details>
+          </>
+        )}
+
+        {activeTab === 'rules' && (
+          <>
+            <section className="guide-callout">
+              <span className="guide-callout-icon">21</span>
+              <div>
+                <strong>The goal</strong>
+                <p>Beat the dealer without exceeding 21. You win by finishing closer to 21, making 21 while the dealer does not, or letting the dealer bust.</p>
+              </div>
+            </section>
+
+            <section>
+              <h3>What each action means</h3>
+              <div className="term-grid">
+                <div><strong>Hit</strong><span>Take another card.</span></div>
+                <div><strong>Stand</strong><span>Keep your total and end your turn.</span></div>
+                <div><strong>Double</strong><span>Double the wager, take exactly one card, then stand.</span></div>
+                <div><strong>Split</strong><span>Turn a pair into two separately wagered hands.</span></div>
+                <div><strong>Insurance</strong><span>A side bet that the dealer has blackjack. Usually a poor bet without a count edge.</span></div>
+                <div><strong>Surrender</strong><span>Forfeit half the wager where offered. Not available in this trainer yet.</span></div>
+              </div>
+            </section>
+
+            <section>
+              <h3>Payoffs & outcomes</h3>
+              <ul className="guide-list">
+                <li><strong>Natural blackjack:</strong> Ace + ten-value card on the original two cards; pays 3:2 here.</li>
+                <li><strong>Regular win:</strong> pays 1:1.</li>
+                <li><strong>Push:</strong> tie; your wager is returned.</li>
+                <li><strong>Bust:</strong> over 21; the wager loses immediately.</li>
+                <li><strong>Split 21:</strong> counts as 21, not a natural blackjack.</li>
+              </ul>
+            </section>
+
+            <details open>
+              <summary>Rules used by this table</summary>
+              <ul className="guide-list">
+                <li>Six-deck shoe with roughly 75% penetration.</li>
+                <li>Dealer hits soft 17 (H17).</li>
+                <li>Blackjack pays 3:2.</li>
+                <li>Double after split is allowed.</li>
+                <li>Split Aces receive one card each.</li>
+              </ul>
+            </details>
+
+            <details>
+              <summary>Common beginner mistakes</summary>
+              <ul className="guide-list">
+                <li>Taking insurance because it feels protective.</li>
+                <li>Standing on 12 against a dealer 2 or 3.</li>
+                <li>Splitting tens or failing to split eights.</li>
+                <li>Ignoring whether a hand is soft when choosing an action.</li>
+                <li>Changing bet size from emotion rather than a defined bankroll plan.</li>
+              </ul>
+            </details>
+          </>
+        )}
+
+        {activeTab === 'counting' && (
+          <>
+            <section className="guide-callout">
+              <span className="guide-callout-icon">±</span>
+              <div>
+                <strong>Counting tracks composition, not the next card.</strong>
+                <p>A positive count means more tens and Aces remain than usual, improving blackjacks and successful doubles.</p>
+              </div>
+            </section>
+
+            <section>
+              <h3>Hi‑Lo tags</h3>
+              <GuideTable rows={countRows} headings={['Cards', 'Tag', 'Meaning']} />
+            </section>
+
+            <section>
+              <h3>Running count → true count</h3>
+              <div className="formula-card">
+                <span>Running count</span>
+                <b>÷</b>
+                <span>Decks remaining</span>
+                <b>=</b>
+                <span>True count</span>
+              </div>
+              <p className="section-intro">Example: +8 with about 2 decks remaining is a true count of +4. Use the true count for betting and deviations.</p>
+            </section>
+
+            <section>
+              <h3>Practice loop</h3>
+              <ol className="guide-list numbered">
+                <li>Start every fresh shoe at 0.</li>
+                <li>Tag every exposed card once.</li>
+                <li>Estimate decks remaining before converting.</li>
+                <li>Keep playing perfect basic strategy.</li>
+                <li>Use deviations only at their exact index.</li>
+              </ol>
+            </section>
+
+            <details>
+              <summary>Reality check</summary>
+              <p className="detail-copy">Card counting is not illegal in many jurisdictions, but casinos can refuse service. Rules vary by location. This trainer teaches arithmetic and decision-making, not guaranteed profit.</p>
+            </details>
+          </>
+        )}
+      </div>
+
+      <div className="study-footer">
+        Strategy shown is tailored to this trainer’s six-deck H17 rules.
+      </div>
+    </aside>
   );
 }
