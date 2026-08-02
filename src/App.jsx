@@ -1616,7 +1616,40 @@ export default function App() {
           </text>
         </svg>
         {gameState === 'shuffling' ? (
-          <div className="shuffle-state"><span>♠</span> Reshuffling shoe…</div>
+          <>
+            <div className="hand-zone dealer-zone shuffle-layout-spacer" aria-hidden="true">
+              <div className="zone-label"><span>Dealer</span><strong>—</strong></div>
+              <div className="card-row dealer-cards">
+                <div className="shoe-placeholder"><span>♠</span><small>SHOE READY</small></div>
+              </div>
+            </div>
+            <div className="hand-zone player-zone shuffle-layout-spacer" aria-hidden="true">
+              <div className="zone-label"><span>Your hands</span><strong>—</strong></div>
+              <div className="player-spots" style={{ display: 'flex', gap: '3rem', justifyContent: 'center', minHeight: '130px' }}>
+                <div className="betting-prompt">
+                  <span>PLACE YOUR WAGER</span>
+                  <small>Choose separate wagers and the number of spots below</small>
+                </div>
+              </div>
+            </div>
+            <div className="shuffle-state" role="status" aria-live="polite">
+              <div className="shuffle-cards" aria-hidden="true">
+                {Array.from({ length: 12 }, (_, cardIndex) => (
+                  <i
+                    key={cardIndex}
+                    className={cardIndex % 2 === 0 ? 'is-left' : 'is-right'}
+                    style={{ '--shuffle-index': Math.floor(cardIndex / 2) }}
+                  >
+                    <span>♠</span>
+                  </i>
+                ))}
+              </div>
+              <div className="shuffle-copy">
+                <strong>Reshuffling shoe</strong>
+                <span>Washing and cutting six decks</span>
+              </div>
+            </div>
+          </>
         ) : (
           <>
             {/* DEALER AREA */}

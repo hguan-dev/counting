@@ -19,7 +19,7 @@ export default function GameControls({
   onNextRound,
 }) {
   return (
-    <div className="game-controls" aria-label="Game controls">
+    <div className={`game-controls is-${gameState}`} aria-label="Game controls">
       {gameState === 'betting' && (
         <div className={`betting-controls has-${numHands}-spots`}>
           <fieldset className="control-field spot-selector">
