@@ -7,6 +7,39 @@ const RANK_NAMES = {
   K: 'king',
 };
 
+const PREMIUM_VOICE_NAMES = [
+  'ava',
+  'samantha',
+  'allison',
+  'serena',
+  'daniel',
+  'aria',
+  'jenny',
+  'guy',
+  'google us english',
+  'google uk english',
+];
+
+export const scoreTableVoice = (voice) => {
+  const name = String(voice?.name || '').toLowerCase();
+  const lang = String(voice?.lang || '').toLowerCase();
+  let score = 0;
+  if (lang === 'en-us') score += 40;
+  else if (lang.startsWith('en-')) score += 30;
+  if (/\b(premium|enhanced|natural|neural)\b/.test(name)) score += 80;
+  const preferredIndex = PREMIUM_VOICE_NAMES.findIndex(preferred => name.includes(preferred));
+  if (preferredIndex >= 0) score += 60 - preferredIndex;
+  if (voice?.localService) score += 8;
+  if (/\b(compact|espeak|robot)\b/.test(name)) score -= 80;
+  return score;
+};
+
+export const choosePreferredTableVoice = (voices) => (
+  [...(voices || [])]
+    .filter(voice => String(voice.lang || '').toLowerCase().startsWith('en'))
+    .sort((left, right) => scoreTableVoice(right) - scoreTableVoice(left))[0] || null
+);
+
 export const getSpokenCard = (card) => (
   RANK_NAMES[card?.value] || String(card?.value || 'unknown card')
 );
@@ -23,9 +56,150 @@ export const getSpokenHandTotal = (cards) => {
   return `${hasUsableAce ? 'soft ' : ''}${total}`;
 };
 
-export const parseVoiceAction = (transcript) => {
-  const normalized = String(transcript || '').toLowerCase();
-  if (/\b(hit|card)\b/.test(normalized)) return 'hit';
-  if (/\b(stand|stay|hold)\b/.test(normalized)) return 'stand';
+const SMALL_NUMBERS = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+
+const parseNumberPhrase = (phrase) => {
+  const digitMatch = phrase.match(/\d+(?:\.\d+)?/);
+  if (digitMatch) return Number(digitMatch[0]);
+
+  let current = 0;
+  let total = 0;
+  let found = false;
+  phrase.split(/\s+/).forEach(word => {
+    if (SMALL_NUMBERS[word] !== undefined) {
+      current += SMALL_NUMBERS[word];
+      found = true;
+    } else if (word === 'hundred') {
+      current = Math.max(1, current) * 100;
+      found = true;
+    } else if (word === 'thousand') {
+      total += Math.max(1, current) * 1000;
+      current = 0;
+      found = true;
+    }
+  });
+  return found ? total + current : null;
+};
+
+const parseBetAmounts = (phrase) => (
+  phrase
+    .replace(/\bdollars?\b/g, '')
+    .split(/\s+(?:and|then)\s+|,/)
+    .map(part => parseNumberPhrase(part.trim()))
+    .filter(amount => Number.isFinite(amount))
+);
+
+export const parseVoiceCommand = (transcript) => {
+  const normalized = String(transcript || '')
+    .toLowerCase()
+    .replace(/[$:]/g, ' ')
+    .replace(/-/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) return null;
+
+  const spotsThenBet = normalized.match(/\b(one|two|1|2)\s+spots?\b.*?\bbets?\b(.+)$/);
+  if (spotsThenBet) {
+    return {
+      type: 'configureBets',
+      spotCount: parseNumberPhrase(spotsThenBet[1]),
+      bets: parseBetAmounts(spotsThenBet[2]),
+    };
+  }
+
+  const explicitSpotBets = normalized.match(
+    /\bspot\s+(?:one|1)\s+(?:bet\s+)?(.+?)\s+(?:and\s+)?spot\s+(?:two|2)\s+(?:bet\s+)?(.+)$/,
+  );
+  if (explicitSpotBets) {
+    return {
+      type: 'configureBets',
+      spotCount: 2,
+      bets: [
+        parseNumberPhrase(explicitSpotBets[1]),
+        parseNumberPhrase(explicitSpotBets[2]),
+      ].filter(amount => Number.isFinite(amount)),
+    };
+  }
+
+  const betOnly = normalized.match(/\bbets?\b(?:\s+(?:is|to|of))?\s+(.+)$/);
+  if (betOnly) {
+    return { type: 'configureBets', spotCount: null, bets: parseBetAmounts(betOnly[1]) };
+  }
+
+  const spotsOnly = normalized.match(/\b(one|two|1|2)\s+spots?\b/);
+  if (spotsOnly) {
+    return { type: 'setSpots', spotCount: parseNumberPhrase(spotsOnly[1]) };
+  }
+
+  const reload = normalized.match(/\b(?:reload|add|buy\s+in)\b.*?(\d+(?:\.\d+)?|[a-z\s]+?)(?:\s+dollars?)?$/);
+  if (reload) {
+    const amount = parseNumberPhrase(reload[1]);
+    if (Number.isFinite(amount)) return { type: 'reload', amount };
+  }
+
+  if (/\b(?:take|accept|yes)\s+even\s+money\b|\beven\s+money\s+yes\b/.test(normalized)) return { type: 'evenMoney', accept: true };
+  if (/\b(?:decline|no|skip)\s+even\s+money\b|\bplay\s+it\s+out\b/.test(normalized)) return { type: 'evenMoney', accept: false };
+  if (/\b(?:buy|take|yes)\s+insurance\b|\binsurance\s+yes\b/.test(normalized)) return { type: 'insurance', buy: true };
+  if (/\b(?:decline|no|skip)\s+insurance\b|\bno\s+insurance\b/.test(normalized)) return { type: 'insurance', buy: false };
+
+  if (/\b(hit|card)\b/.test(normalized)) return { type: 'action', action: 'hit' };
+  if (/\b(stand|stay|hold)\b/.test(normalized)) return { type: 'action', action: 'stand' };
+  if (/\bdouble(?:\s+down)?\b/.test(normalized)) return { type: 'action', action: 'double' };
+  if (/\b(?:split|resplit)\b/.test(normalized)) return { type: 'action', action: 'split' };
+  if (/\b(?:next\s+round|new\s+round|deal\s+again)\b/.test(normalized)) return { type: 'nextRound' };
+  if (/\b(?:deal|deal\s+cards|start\s+round)\b/.test(normalized)) return { type: 'deal' };
+  if (/\b(?:proceed|do\s+it|play\s+anyway)\b/.test(normalized)) return { type: 'proceed' };
+  if (/\b(?:correct\s+play|go\s+back|cancel)\b/.test(normalized)) return { type: 'cancel' };
+  if (/\b(?:running\s+count|true\s+count|count)\b/.test(normalized)) return { type: 'count' };
+  if (/\b(?:bankroll|balance)\b/.test(normalized)) return { type: 'bankroll' };
+  if (/\b(?:repeat|status|what\s+can\s+i\s+do)\b/.test(normalized)) return { type: 'status' };
+  if (/\b(?:help|voice\s+help|commands)\b/.test(normalized)) return { type: 'help' };
+  if (/\b(?:dealer\s+voice|narration)\s+(?:off|mute)\b/.test(normalized)) return { type: 'speech', enabled: false };
+  if (/\b(?:dealer\s+voice|narration)\s+on\b/.test(normalized)) return { type: 'speech', enabled: true };
+  if (/\b(?:guard|strategy\s+guard)\s+off\b/.test(normalized)) return { type: 'guard', enabled: false };
+  if (/\b(?:guard|strategy\s+guard)\s+on\b/.test(normalized)) return { type: 'guard', enabled: true };
+  if (/\bpopups?\s+off\b/.test(normalized)) return { type: 'popups', enabled: false };
+  if (/\bpopups?\s+on\b/.test(normalized)) return { type: 'popups', enabled: true };
+  if (/\b(?:open|show)\s+(?:the\s+)?study\s+guide\b/.test(normalized)) return { type: 'studyGuide', open: true };
+  if (/\bclose\s+(?:the\s+)?study\s+guide\b/.test(normalized)) return { type: 'studyGuide', open: false };
+  if (/\bexport\b/.test(normalized)) return { type: 'export' };
+  if (/\b(?:mute|sound\s+off)\b/.test(normalized)) return { type: 'sound', enabled: false };
+  if (/\b(?:unmute|sound\s+on)\b/.test(normalized)) return { type: 'sound', enabled: true };
+
   return null;
+};
+
+export const parseVoiceAction = (transcript) => {
+  const command = parseVoiceCommand(transcript);
+  return command?.type === 'action' ? command.action : null;
 };

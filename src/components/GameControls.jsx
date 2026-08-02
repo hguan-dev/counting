@@ -1,7 +1,7 @@
 export default function GameControls({
   gameState,
-  initialBet,
-  setInitialBet,
+  spotBets,
+  setSpotBet,
   numHands,
   setNumHands,
   onDeal,
@@ -24,13 +24,6 @@ export default function GameControls({
     <div className="game-controls" aria-label="Game controls">
       {gameState === 'betting' && (
         <div className="betting-controls">
-          <label className="control-field" htmlFor="wager">
-            <span>Wager per spot</span>
-            <span className="control-input has-prefix">
-              <b>$</b>
-              <input id="wager" aria-label="Wager amount" type="number" value={initialBet} onChange={(e) => setInitialBet(Number(e.target.value))} step="25" min="25" />
-            </span>
-          </label>
           <label className="control-field" htmlFor="spots">
             <span>Player spots</span>
             <select id="spots" aria-label="Number of spots" value={numHands} onChange={(e) => setNumHands(Number(e.target.value))}>
@@ -38,9 +31,27 @@ export default function GameControls({
               <option value={2}>2 spots</option>
             </select>
           </label>
+          {Array.from({ length: numHands }, (_, spotIndex) => (
+            <label className="control-field" htmlFor={`wager-${spotIndex + 1}`} key={spotIndex}>
+              <span>Spot {spotIndex + 1} wager</span>
+              <span className="control-input has-prefix">
+                <b>$</b>
+                <input
+                  id={`wager-${spotIndex + 1}`}
+                  aria-label={`Spot ${spotIndex + 1} wager amount`}
+                  type="number"
+                  value={spotBets[spotIndex]}
+                  onChange={(event) => setSpotBet(spotIndex, Number(event.target.value))}
+                  step="5"
+                  min="5"
+                  max="10000"
+                />
+              </span>
+            </label>
+          ))}
           <button className="deal-button" onClick={onDeal}>
             <span>Deal cards</span>
-            <small>${initialBet * numHands} total</small>
+            <small>${spotBets.slice(0, numHands).reduce((sum, bet) => sum + bet, 0)} total</small>
           </button>
         </div>
       )}
@@ -50,7 +61,7 @@ export default function GameControls({
           <div className="decision-copy">
             <span className="decision-kicker">Dealer shows an Ace</span>
             <strong>Insure eligible hands?</strong>
-            <small>Costs half your wager. Pays 2:1 only if the dealer has blackjack.</small>
+            <small>Costs half each eligible spot’s wager. Pays 2:1 only if the dealer has blackjack.</small>
           </div>
           <button className="decision-button is-gold" onClick={() => onInsurance(true)}>Buy insurance</button>
           <button className="decision-button" onClick={() => onInsurance(false)}>No insurance</button>
@@ -78,7 +89,7 @@ export default function GameControls({
                     ? 'Listening…'
                     : voiceInputEnabled ? 'Voice commands on' : 'Enable voice commands'
                 : 'Voice commands unavailable'}
-              <small>{lastHeard ? `Heard: “${lastHeard}”` : 'Say “hit” or “stand”'}</small>
+              <small>{lastHeard ? `Heard: “${lastHeard}”` : 'All table actions are available by voice'}</small>
             </span>
           </button>
         </div>

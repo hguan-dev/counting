@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { parseVoiceAction } from '../utils/tableSpeech';
+import {
+  choosePreferredTableVoice,
+  parseVoiceCommand,
+  scoreTableVoice,
+} from '../utils/tableSpeech';
 
 const SOUND_PATTERNS = {
   card: [[620, 0.035, 0], [420, 0.045, 0.04]],
@@ -10,12 +14,15 @@ const SOUND_PATTERNS = {
   win: [[520, 0.07, 0], [660, 0.07, 0.08], [820, 0.12, 0.16]],
 };
 
-export default function useTableVoice({ isPlaying, onCommand }) {
+export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [voiceInputEnabled, setVoiceInputEnabled] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('off');
   const [lastHeard, setLastHeard] = useState('');
+  const [lastAnnouncement, setLastAnnouncement] = useState('');
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState('');
   const [voiceSupported] = useState(() => (
     typeof window !== 'undefined'
     && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -24,12 +31,15 @@ export default function useTableVoice({ isPlaying, onCommand }) {
   const audioContextRef = useRef(null);
   const recognitionRef = useRef(null);
   const onCommandRef = useRef(onCommand);
-  const isPlayingRef = useRef(isPlaying);
+  const isListeningAllowedRef = useRef(isListeningAllowed);
   const voiceInputEnabledRef = useRef(voiceInputEnabled);
+  const speakingRef = useRef(false);
+  const selectedVoiceNameRef = useRef(selectedVoiceName);
 
   onCommandRef.current = onCommand;
-  isPlayingRef.current = isPlaying;
+  isListeningAllowedRef.current = isListeningAllowed;
   voiceInputEnabledRef.current = voiceInputEnabled;
+  selectedVoiceNameRef.current = selectedVoiceName;
 
   const playSound = (type) => {
     if (!soundEnabled || typeof window === 'undefined') return;
@@ -66,7 +76,12 @@ export default function useTableVoice({ isPlaying, onCommand }) {
   };
 
   const startListening = () => {
-    if (!voiceInputEnabledRef.current || !isPlayingRef.current || !recognitionRef.current) return;
+    if (
+      !voiceInputEnabledRef.current
+      || !isListeningAllowedRef.current
+      || speakingRef.current
+      || !recognitionRef.current
+    ) return;
     try {
       recognitionRef.current.start();
       setVoiceStatus('listening');
@@ -84,10 +99,12 @@ export default function useTableVoice({ isPlaying, onCommand }) {
     recognition.lang = 'en-US';
     recognition.onresult = (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript || '';
-      const action = parseVoiceAction(transcript);
+      const command = parseVoiceCommand(transcript);
       setLastHeard(transcript);
-      setVoiceStatus(action ? 'heard' : 'ready');
-      if (action && isPlayingRef.current) onCommandRef.current?.(action);
+      setVoiceStatus(command ? 'heard' : 'ready');
+      if (isListeningAllowedRef.current) {
+        onCommandRef.current?.(command || { type: 'unknown', transcript });
+      }
     };
     recognition.onerror = (event) => {
       setVoiceStatus(event.error === 'not-allowed' ? 'blocked' : 'ready');
@@ -96,6 +113,13 @@ export default function useTableVoice({ isPlaying, onCommand }) {
       setVoiceStatus(current => (
         current === 'blocked' || !voiceInputEnabledRef.current ? current : 'ready'
       ));
+      if (
+        voiceInputEnabledRef.current
+        && isListeningAllowedRef.current
+        && !speakingRef.current
+      ) {
+        window.setTimeout(startListening, 180);
+      }
     };
     recognitionRef.current = recognition;
     return recognition;
@@ -114,14 +138,18 @@ export default function useTableVoice({ isPlaying, onCommand }) {
     voiceInputEnabledRef.current = true;
     setVoiceInputEnabled(true);
     setVoiceStatus('ready');
-    if (isPlayingRef.current) startListening();
+    if (isListeningAllowedRef.current) startListening();
+    return true;
   };
 
   const announce = (text, { listenAfter = false } = {}) => {
     if (typeof window === 'undefined') return;
+    setLastAnnouncement(text);
     if (recognitionRef.current) stopListening();
+    speakingRef.current = true;
 
     const beginListening = () => {
+      speakingRef.current = false;
       if (listenAfter) startListening();
     };
 
@@ -132,21 +160,40 @@ export default function useTableVoice({ isPlaying, onCommand }) {
 
     window.speechSynthesis.cancel();
     const utterance = new window.SpeechSynthesisUtterance(text);
-    utterance.rate = 0.96;
-    utterance.pitch = 0.92;
-    utterance.volume = 0.9;
+    const voice = availableVoices.find(item => item.name === selectedVoiceNameRef.current)
+      || choosePreferredTableVoice(availableVoices);
+    if (voice) utterance.voice = voice;
+    utterance.rate = 0.88;
+    utterance.pitch = 0.94;
+    utterance.volume = 0.95;
     utterance.onend = beginListening;
     utterance.onerror = beginListening;
     window.speechSynthesis.speak(utterance);
   };
 
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isListeningAllowed) {
       stopListening();
     } else if (voiceInputEnabledRef.current) {
       startListening();
     }
-  }, [isPlaying]);
+  }, [isListeningAllowed]);
+
+  useEffect(() => {
+    if (!window.speechSynthesis) return undefined;
+    const refreshVoices = () => {
+      const voices = window.speechSynthesis.getVoices()
+        .filter(voice => voice.lang.toLowerCase().startsWith('en'))
+        .sort((left, right) => scoreTableVoice(right) - scoreTableVoice(left));
+      setAvailableVoices(voices);
+      setSelectedVoiceName(current => (
+        current || choosePreferredTableVoice(voices)?.name || ''
+      ));
+    };
+    refreshVoices();
+    window.speechSynthesis.addEventListener?.('voiceschanged', refreshVoices);
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', refreshVoices);
+  }, []);
 
   useEffect(() => () => {
     recognitionRef.current?.abort();
@@ -156,10 +203,14 @@ export default function useTableVoice({ isPlaying, onCommand }) {
 
   return {
     announce,
+    availableVoices,
+    lastAnnouncement,
     lastHeard,
     playSound,
+    selectedVoiceName,
     setSoundEnabled,
     setSpeechEnabled,
+    setSelectedVoiceName,
     soundEnabled,
     speechEnabled,
     toggleVoiceInput,

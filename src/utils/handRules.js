@@ -49,6 +49,14 @@ export const getNaturalBlackjackSettlement = (hand, dealerHasBlackjack) => {
   return { outcome: 'win', returnAmount: hand.bet * 2.5 };
 };
 
+export const getInsuranceBets = (spots, buy) => (
+  spots.map(spot => (
+    buy && spot.subHands.some(hand => !isNaturalBlackjack(hand))
+      ? (spot.subHands[0]?.bet || 0) / 2
+      : 0
+  ))
+);
+
 export const canSplitHand = (hand) => (
   Boolean(hand)
   && hand.status === 'playing'

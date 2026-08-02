@@ -75,7 +75,7 @@ button:disabled {
 
 .header-bar {
   display: grid !important;
-  grid-template-columns: minmax(230px, 1fr) auto minmax(430px, 1fr);
+  grid-template-columns: minmax(350px, 0.85fr) auto minmax(0, 1.35fr);
   gap: 1.5rem;
   align-items: center !important;
   padding: 0 0 1rem !important;
@@ -154,7 +154,12 @@ button:disabled {
 }
 
 .header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
   justify-content: flex-end;
+  gap: 0.48rem;
+  flex-wrap: wrap;
 }
 
 .toggle-label {
@@ -166,6 +171,36 @@ button:disabled {
   cursor: pointer;
 }
 
+.voice-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.voice-picker select {
+  width: min(168px, 24vw);
+  min-height: 34px;
+  padding: 0.42rem 1.65rem 0.42rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(4, 28, 18, 0.86);
+  color: var(--cream);
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.voice-picker select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
 .topbar-button,
 .icon-button {
   padding: 0.52rem 0.78rem;
@@ -175,6 +210,17 @@ button:disabled {
   color: var(--cream);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  border: 0 !important;
+  white-space: nowrap !important;
 }
 
 .topbar-button.is-featured {
@@ -1257,6 +1303,14 @@ button:disabled {
 
   .topbar-button {
     flex: 1;
+  }
+
+  .voice-picker {
+    flex: 1 1 190px;
+  }
+
+  .voice-picker select {
+    width: 100%;
   }
 
   .count-panel {

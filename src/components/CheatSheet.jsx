@@ -179,6 +179,17 @@ export default function CheatSheet({ onClose }) {
                 <li>Changing bet size from emotion rather than a defined bankroll plan.</li>
               </ul>
             </details>
+
+            <details>
+              <summary>Hands-free & vision-free play</summary>
+              <ul className="guide-list">
+                <li>Enable <strong>Hands-free mode</strong> once, then say “help” at any time.</li>
+                <li>Configure unequal wagers naturally: “two spots, bet 25 and 50.”</li>
+                <li>Every round decision is supported: hit, stand, double, split, insurance, even money, and next round.</li>
+                <li>Say “status,” “bankroll,” or “count” to hear the current table state.</li>
+                <li>Spoken prompts pause microphone listening while the dealer talks, then resume automatically.</li>
+              </ul>
+            </details>
           </>
         )}
 

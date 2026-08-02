@@ -5,6 +5,7 @@ import {
   canSplitHand,
   findNextPlayableHand,
   getEvenMoneyOffers,
+  getInsuranceBets,
   getNaturalBlackjackSettlement,
   isNaturalBlackjack,
   splitHand,
@@ -180,5 +181,22 @@ describe('per-hand even money', () => {
       outcome: 'push',
       returnAmount: 40,
     });
+  });
+});
+
+describe('per-spot insurance', () => {
+  test('uses half of each eligible spot’s independent wager', () => {
+    const natural = playingHand(
+      [new Card('♥', 'A'), new Card('♠', 'K')],
+      { bet: 25 },
+    );
+    const spots = [
+      { subHands: [playingHand([new Card('♦', '8'), new Card('♣', '10')], { bet: 25 })] },
+      { subHands: [playingHand([new Card('♦', '6'), new Card('♣', '10')], { bet: 50 })] },
+      { subHands: [natural] },
+    ];
+
+    expect(getInsuranceBets(spots, true)).toEqual([12.5, 25, 0]);
+    expect(getInsuranceBets(spots, false)).toEqual([0, 0, 0]);
   });
 });
