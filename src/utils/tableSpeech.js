@@ -63,6 +63,11 @@ export const getSpokenHandTotal = (cards) => {
   return `${hasUsableAce ? 'soft ' : ''}${total}`;
 };
 
+export const getSpokenCountSummary = (runningCount, trueCount, decksRemaining) => {
+  const approximateDecks = Math.round(Number(decksRemaining) * 2) / 2;
+  return `The running count is ${runningCount}. The true count is ${trueCount}. Approximately ${approximateDecks} decks remaining.`;
+};
+
 const SMALL_NUMBERS = {
   zero: 0,
   one: 1,
@@ -187,6 +192,7 @@ export const parseVoiceCommand = (transcript) => {
   if (/\b(?:deal|deal\s+cards|start\s+round)\b/.test(normalized)) return { type: 'deal' };
   if (/\b(?:proceed|do\s+it|play\s+anyway)\b/.test(normalized)) return { type: 'proceed' };
   if (/\b(?:correct\s+play|go\s+back|cancel)\b/.test(normalized)) return { type: 'cancel' };
+  if (/\b(?:tip|hint|advice|recommended\s+(?:move|play)|correct\s+move|what\s+should\s+i\s+do|what(?:'s|\s+is)\s+the\s+(?:move|play))\b/.test(normalized)) return { type: 'tip' };
   if (/\b(?:running\s+count|true\s+count|count)\b/.test(normalized)) return { type: 'count' };
   if (/\b(?:bankroll|balance)\b/.test(normalized)) return { type: 'bankroll' };
   if (/\b(?:repeat|status|what\s+can\s+i\s+do)\b/.test(normalized)) return { type: 'status' };

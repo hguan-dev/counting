@@ -172,7 +172,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     return recognition;
   };
 
-  const toggleVoiceInput = () => {
+  const toggleVoiceInput = async () => {
     if (!voiceSupported) return;
     if (voiceInputEnabledRef.current) {
       voiceInputEnabledRef.current = false;
@@ -180,6 +180,19 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       setVoiceInputEnabled(false);
       stopListening();
       return;
+    }
+
+    if (window.navigator?.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await window.navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+      } catch {
+        restartAllowedRef.current = false;
+        setVoiceInputEnabled(false);
+        setVoiceStatus('blocked');
+        setVoiceError('Microphone access is blocked. Allow it in the browser site settings.');
+        return false;
+      }
     }
 
     ensureRecognition();
