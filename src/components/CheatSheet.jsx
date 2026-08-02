@@ -187,6 +187,7 @@ export default function CheatSheet({ onClose }) {
                 <li>Configure unequal wagers naturally: “two spots, bet 25 and 50.”</li>
                 <li>Every round decision is supported: hit, stand, double, split, insurance, even money, and next round.</li>
                 <li>Say “status,” “bankroll,” or “count” to hear the current table state.</li>
+                <li>Say “microphone test” to confirm that speech is detected, transcribed, and matched end to end.</li>
                 <li>Spoken prompts pause microphone listening while the dealer talks, then resume automatically.</li>
               </ul>
             </details>

@@ -17,6 +17,7 @@ export default function GameControls({
   lastHeard,
   onToggleVoiceInput,
   voiceInputEnabled,
+  voiceError,
   voiceStatus,
   voiceSupported,
 }) {
@@ -75,7 +76,7 @@ export default function GameControls({
           {canDouble && <button className="action-button is-double" onClick={onDouble}><span>Double</span><small>One card</small></button>}
           {canSplit && <button className="action-button is-split" onClick={onSplit}><span>{canResplit ? 'Resplit' : 'Split'}</span><small>Up to 4 hands</small></button>}
           <button
-            className={`voice-action ${voiceInputEnabled ? 'is-on' : ''} ${voiceStatus === 'listening' ? 'is-listening' : ''}`}
+            className={`voice-action ${voiceInputEnabled ? 'is-on' : ''} ${['starting', 'listening', 'hearing', 'processing'].includes(voiceStatus) ? 'is-listening' : ''}`}
             onClick={onToggleVoiceInput}
             disabled={!voiceSupported}
             aria-pressed={voiceInputEnabled}
@@ -85,11 +86,17 @@ export default function GameControls({
               {voiceSupported
                 ? voiceStatus === 'blocked'
                   ? 'Microphone blocked'
-                  : voiceStatus === 'listening'
+                  : voiceStatus === 'error'
+                    ? 'Microphone needs attention'
+                    : voiceStatus === 'hearing'
+                      ? 'Hearing you…'
+                      : voiceStatus === 'processing'
+                        ? 'Matching command…'
+                        : ['starting', 'listening'].includes(voiceStatus)
                     ? 'Listening…'
                     : voiceInputEnabled ? 'Voice commands on' : 'Enable voice commands'
                 : 'Voice commands unavailable'}
-              <small>{lastHeard ? `Heard: “${lastHeard}”` : 'All table actions are available by voice'}</small>
+              <small>{voiceError || (lastHeard ? `Heard: “${lastHeard}”` : 'Say “microphone test” to check recognition')}</small>
             </span>
           </button>
         </div>

@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   choosePreferredTableVoice,
-  parseVoiceCommand,
+  getRecognitionErrorMessage,
+  getRecognitionResult,
   scoreTableVoice,
 } from '../utils/tableSpeech';
+import {
+  KOKORO_VOICES,
+  speakWithKokoro,
+  stopKokoroSpeech,
+} from '../utils/kokoroVoice';
 
 const SOUND_PATTERNS = {
   card: [[620, 0.035, 0], [420, 0.045, 0.04]],
@@ -19,10 +25,15 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [voiceInputEnabled, setVoiceInputEnabled] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('off');
+  const [voiceError, setVoiceError] = useState('');
+  const [voiceModelStatus, setVoiceModelStatus] = useState('ready');
+  const [voiceModelProgress, setVoiceModelProgress] = useState(0);
   const [lastHeard, setLastHeard] = useState('');
   const [lastAnnouncement, setLastAnnouncement] = useState('');
   const [availableVoices, setAvailableVoices] = useState([]);
-  const [selectedVoiceName, setSelectedVoiceName] = useState('');
+  const [selectedVoiceName, setSelectedVoiceName] = useState(() => (
+    typeof window !== 'undefined' ? window.localStorage.getItem('blackjack-dealer-voice') || '' : ''
+  ));
   const [voiceSupported] = useState(() => (
     typeof window !== 'undefined'
     && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -35,6 +46,10 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const voiceInputEnabledRef = useRef(voiceInputEnabled);
   const speakingRef = useRef(false);
   const selectedVoiceNameRef = useRef(selectedVoiceName);
+  const announcementIdRef = useRef(0);
+  const recognitionActiveRef = useRef(false);
+  const restartTimerRef = useRef(null);
+  const restartAllowedRef = useRef(true);
 
   onCommandRef.current = onCommand;
   isListeningAllowedRef.current = isListeningAllowed;
@@ -67,6 +82,10 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   };
 
   const stopListening = () => {
+    if (restartTimerRef.current) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
     try {
       recognitionRef.current?.stop();
     } catch {
@@ -81,12 +100,14 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       || !isListeningAllowedRef.current
       || speakingRef.current
       || !recognitionRef.current
+      || recognitionActiveRef.current
     ) return;
     try {
+      setVoiceError('');
+      setVoiceStatus('starting');
       recognitionRef.current.start();
-      setVoiceStatus('listening');
     } catch {
-      setVoiceStatus('ready');
+      if (!recognitionActiveRef.current) setVoiceStatus('ready');
     }
   };
 
@@ -94,31 +115,62 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     if (!voiceSupported || recognitionRef.current) return recognitionRef.current;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new Recognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 5;
+    recognition.lang = window.navigator?.language || 'en-US';
+    recognition.onstart = () => {
+      recognitionActiveRef.current = true;
+      restartAllowedRef.current = true;
+      setVoiceError('');
+      setVoiceStatus('listening');
+    };
+    recognition.onaudiostart = () => setVoiceStatus('listening');
+    recognition.onspeechstart = () => setVoiceStatus('hearing');
+    recognition.onspeechend = () => setVoiceStatus('processing');
     recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || '';
-      const command = parseVoiceCommand(transcript);
-      setLastHeard(transcript);
-      setVoiceStatus(command ? 'heard' : 'ready');
-      if (isListeningAllowedRef.current) {
-        onCommandRef.current?.(command || { type: 'unknown', transcript });
+      const result = getRecognitionResult(event);
+      if (!result) return;
+      setLastHeard(result.transcript);
+      if (!result.isFinal) {
+        setVoiceStatus('hearing');
+        return;
       }
+      setVoiceStatus(result.command ? 'heard' : 'listening');
+      if (isListeningAllowedRef.current) onCommandRef.current?.(
+        result.command || { type: 'unknown', transcript: result.transcript },
+      );
     };
     recognition.onerror = (event) => {
-      setVoiceStatus(event.error === 'not-allowed' ? 'blocked' : 'ready');
+      if (event.error === 'aborted' && (speakingRef.current || !voiceInputEnabledRef.current)) {
+        return;
+      }
+      const isBlocking = [
+        'audio-capture',
+        'language-not-supported',
+        'not-allowed',
+        'service-not-allowed',
+      ].includes(event.error);
+      restartAllowedRef.current = !isBlocking && event.error !== 'network';
+      setVoiceError(getRecognitionErrorMessage(event.error));
+      setVoiceStatus(isBlocking ? 'blocked' : 'error');
+    };
+    recognition.onnomatch = () => {
+      setVoiceError('Speech was detected, but no blackjack command matched.');
+      setVoiceStatus('error');
     };
     recognition.onend = () => {
+      recognitionActiveRef.current = false;
       setVoiceStatus(current => (
-        current === 'blocked' || !voiceInputEnabledRef.current ? current : 'ready'
+        ['blocked', 'error'].includes(current) || !voiceInputEnabledRef.current ? current : 'ready'
       ));
       if (
         voiceInputEnabledRef.current
         && isListeningAllowedRef.current
         && !speakingRef.current
+        && restartAllowedRef.current
       ) {
-        window.setTimeout(startListening, 180);
+        restartTimerRef.current = window.setTimeout(startListening, 300);
       }
     };
     recognitionRef.current = recognition;
@@ -129,6 +181,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     if (!voiceSupported) return;
     if (voiceInputEnabledRef.current) {
       voiceInputEnabledRef.current = false;
+      restartAllowedRef.current = false;
       setVoiceInputEnabled(false);
       stopListening();
       return;
@@ -136,7 +189,9 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
 
     ensureRecognition();
     voiceInputEnabledRef.current = true;
+    restartAllowedRef.current = true;
     setVoiceInputEnabled(true);
+    setVoiceError('');
     setVoiceStatus('ready');
     if (isListeningAllowedRef.current) startListening();
     return true;
@@ -144,31 +199,86 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
 
   const announce = (text, { listenAfter = false } = {}) => {
     if (typeof window === 'undefined') return;
+    const announcementId = ++announcementIdRef.current;
     setLastAnnouncement(text);
     if (recognitionRef.current) stopListening();
     speakingRef.current = true;
+    stopKokoroSpeech();
 
+    let finished = false;
+    let resolveAnnouncement;
+    const announcementComplete = new Promise(resolve => {
+      resolveAnnouncement = resolve;
+    });
     const beginListening = () => {
+      if (finished) return;
+      finished = true;
+      if (announcementId !== announcementIdRef.current) {
+        resolveAnnouncement();
+        return;
+      }
       speakingRef.current = false;
       if (listenAfter) startListening();
+      resolveAnnouncement();
     };
 
-    if (!speechEnabled || !window.speechSynthesis) {
+    if (!speechEnabled) {
       beginListening();
-      return;
+      return announcementComplete;
     }
 
-    window.speechSynthesis.cancel();
-    const utterance = new window.SpeechSynthesisUtterance(text);
-    const voice = availableVoices.find(item => item.name === selectedVoiceNameRef.current)
-      || choosePreferredTableVoice(availableVoices);
-    if (voice) utterance.voice = voice;
-    utterance.rate = 0.88;
-    utterance.pitch = 0.94;
-    utterance.volume = 0.95;
-    utterance.onend = beginListening;
-    utterance.onerror = beginListening;
-    window.speechSynthesis.speak(utterance);
+    window.speechSynthesis?.cancel();
+    const speakWithSystemVoice = () => {
+      if (announcementId !== announcementIdRef.current) {
+        beginListening();
+        return;
+      }
+      if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+        beginListening();
+        return;
+      }
+      const utterance = new window.SpeechSynthesisUtterance(text);
+      const voice = availableVoices.find(item => item.name === selectedVoiceNameRef.current)
+        || choosePreferredTableVoice(availableVoices);
+      if (voice) utterance.voice = voice;
+      utterance.rate = 0.88;
+      utterance.pitch = 0.94;
+      utterance.volume = 0.95;
+      utterance.onend = beginListening;
+      utterance.onerror = beginListening;
+      window.speechSynthesis.speak(utterance);
+    };
+
+    if (selectedVoiceNameRef.current.startsWith('kokoro:')) {
+      setVoiceModelStatus('loading');
+      const kokoroSpeech = speakWithKokoro(
+        text,
+        selectedVoiceNameRef.current.replace('kokoro:', ''),
+        progress => {
+          if (progress?.status === 'progress') {
+            setVoiceModelStatus('loading');
+            setVoiceModelProgress(Math.round(progress.progress || 0));
+          }
+        },
+      );
+      const firstUseTimeout = new Promise((_, reject) => {
+        window.setTimeout(() => reject(new Error('Kokoro is still warming up.')), 8000);
+      });
+      Promise.race([kokoroSpeech, firstUseTimeout])
+        .then(() => {
+          setVoiceModelStatus('ready');
+          setVoiceModelProgress(100);
+          beginListening();
+        })
+        .catch(() => {
+          stopKokoroSpeech();
+          setVoiceModelStatus('warming');
+          speakWithSystemVoice();
+        });
+    } else {
+      speakWithSystemVoice();
+    }
+    return announcementComplete;
   };
 
   useEffect(() => {
@@ -195,15 +305,24 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     return () => window.speechSynthesis.removeEventListener?.('voiceschanged', refreshVoices);
   }, []);
 
+  useEffect(() => {
+    if (selectedVoiceName) {
+      window.localStorage.setItem('blackjack-dealer-voice', selectedVoiceName);
+    }
+  }, [selectedVoiceName]);
+
   useEffect(() => () => {
+    if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
     recognitionRef.current?.abort();
     window.speechSynthesis?.cancel();
+    stopKokoroSpeech();
     audioContextRef.current?.close();
   }, []);
 
   return {
     announce,
     availableVoices,
+    kokoroVoices: KOKORO_VOICES,
     lastAnnouncement,
     lastHeard,
     playSound,
@@ -215,6 +334,9 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     speechEnabled,
     toggleVoiceInput,
     voiceInputEnabled,
+    voiceError,
+    voiceModelProgress,
+    voiceModelStatus,
     voiceStatus,
     voiceSupported,
   };

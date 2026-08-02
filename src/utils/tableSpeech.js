@@ -44,6 +44,13 @@ export const getSpokenCard = (card) => (
   RANK_NAMES[card?.value] || String(card?.value || 'unknown card')
 );
 
+export const getDealerCardCall = (card) => `${getSpokenCard(card)}.`;
+
+export const getDealerFinishCall = (cards) => {
+  const total = calculateTotal(cards);
+  return total > 21 ? 'Too many. Dealer busts.' : `Dealer ${total}.`;
+};
+
 export const getSpokenHandTotal = (cards) => {
   const total = calculateTotal(cards);
   const hardTotal = cards?.reduce((sum, card) => {
@@ -183,6 +190,7 @@ export const parseVoiceCommand = (transcript) => {
   if (/\b(?:running\s+count|true\s+count|count)\b/.test(normalized)) return { type: 'count' };
   if (/\b(?:bankroll|balance)\b/.test(normalized)) return { type: 'bankroll' };
   if (/\b(?:repeat|status|what\s+can\s+i\s+do)\b/.test(normalized)) return { type: 'status' };
+  if (/\b(?:microphone|mic|voice)\s+(?:test|check)\b/.test(normalized)) return { type: 'micTest' };
   if (/\b(?:help|voice\s+help|commands)\b/.test(normalized)) return { type: 'help' };
   if (/\b(?:dealer\s+voice|narration)\s+(?:off|mute)\b/.test(normalized)) return { type: 'speech', enabled: false };
   if (/\b(?:dealer\s+voice|narration)\s+on\b/.test(normalized)) return { type: 'speech', enabled: true };
@@ -202,4 +210,39 @@ export const parseVoiceCommand = (transcript) => {
 export const parseVoiceAction = (transcript) => {
   const command = parseVoiceCommand(transcript);
   return command?.type === 'action' ? command.action : null;
+};
+
+export const getRecognitionResult = (event) => {
+  const resultIndex = Number.isInteger(event?.resultIndex)
+    ? event.resultIndex
+    : Math.max(0, (event?.results?.length || 1) - 1);
+  const result = event?.results?.[resultIndex];
+  if (!result) return null;
+
+  const alternatives = Array.from(result)
+    .map(alternative => String(alternative?.transcript || '').trim())
+    .filter(Boolean);
+  const recognized = alternatives
+    .map(transcript => ({ transcript, command: parseVoiceCommand(transcript) }))
+    .find(candidate => candidate.command);
+
+  return {
+    command: recognized?.command || null,
+    isFinal: Boolean(result.isFinal),
+    transcript: recognized?.transcript || alternatives[0] || '',
+  };
+};
+
+export const getRecognitionErrorMessage = (errorCode) => {
+  const messages = {
+    'aborted': 'Microphone listening was interrupted.',
+    'audio-capture': 'No working microphone input was found.',
+    'bad-grammar': 'The speech service could not load its command grammar.',
+    'language-not-supported': 'Speech recognition does not support this language.',
+    'network': 'The browser could not reach its speech recognition service.',
+    'no-speech': 'No speech was detected. Move closer and try again.',
+    'not-allowed': 'Microphone access is blocked. Allow it in the browser site settings.',
+    'service-not-allowed': 'The browser speech recognition service is blocked.',
+  };
+  return messages[errorCode] || 'Speech recognition stopped unexpectedly. Try turning hands-free mode off and on.';
 };

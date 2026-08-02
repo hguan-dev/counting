@@ -2,6 +2,10 @@ import { describe, expect, test } from 'vitest';
 import { Card } from '../models/Card';
 import {
   choosePreferredTableVoice,
+  getDealerCardCall,
+  getDealerFinishCall,
+  getRecognitionErrorMessage,
+  getRecognitionResult,
   getSpokenCard,
   getSpokenHandTotal,
   parseVoiceAction,
@@ -20,6 +24,20 @@ describe('table speech', () => {
       new Card('♠', '9'),
     ])).toBe('soft 21');
     expect(getSpokenHandTotal([new Card('♥', '10'), new Card('♠', '7')])).toBe('17');
+  });
+
+  test('keeps dealer reveal calls short and card-by-card', () => {
+    expect(getDealerCardCall(new Card('♥', '4'))).toBe('4.');
+    expect(getDealerFinishCall([
+      new Card('♥', '5'),
+      new Card('♠', '4'),
+      new Card('♦', '3'),
+      new Card('♣', '10'),
+    ])).toBe('Too many. Dealer busts.');
+    expect(getDealerFinishCall([
+      new Card('♥', '10'),
+      new Card('♠', '7'),
+    ])).toBe('Dealer 17.');
   });
 
   test('recognizes hit and stand commands without substring false positives', () => {
@@ -61,6 +79,44 @@ describe('table speech', () => {
     expect(parseVoiceCommand('dealer voice off')).toEqual({ type: 'speech', enabled: false });
     expect(parseVoiceCommand('strategy guard on')).toEqual({ type: 'guard', enabled: true });
     expect(parseVoiceCommand('open the study guide')).toEqual({ type: 'studyGuide', open: true });
+    expect(parseVoiceCommand('microphone test')).toEqual({ type: 'micTest' });
+  });
+
+  test('uses a parseable recognition alternative instead of dropping the command', () => {
+    const result = [
+      { transcript: 'I understand' },
+      { transcript: 'stand' },
+      { transcript: 'stay' },
+    ];
+    result.isFinal = true;
+
+    expect(getRecognitionResult({ resultIndex: 0, results: [result] })).toEqual({
+      command: { type: 'action', action: 'stand' },
+      isFinal: true,
+      transcript: 'stand',
+    });
+  });
+
+  test('keeps interim speech visible without dispatching it', () => {
+    const result = [{ transcript: 'two spots bet twenty' }];
+    result.isFinal = false;
+
+    expect(getRecognitionResult({ resultIndex: 0, results: [result] })).toEqual({
+      command: {
+        type: 'configureBets',
+        spotCount: 2,
+        bets: [20],
+      },
+      isFinal: false,
+      transcript: 'two spots bet twenty',
+    });
+  });
+
+  test('explains microphone and speech-service failures', () => {
+    expect(getRecognitionErrorMessage('not-allowed')).toContain('site settings');
+    expect(getRecognitionErrorMessage('audio-capture')).toContain('microphone');
+    expect(getRecognitionErrorMessage('network')).toContain('speech recognition service');
+    expect(getRecognitionErrorMessage('something-new')).toContain('stopped unexpectedly');
   });
 
   test('prefers natural premium English voices over robotic fallbacks', () => {
