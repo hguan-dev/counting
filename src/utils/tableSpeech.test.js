@@ -85,6 +85,7 @@ describe('table speech', () => {
     expect(parseVoiceCommand('next')).toEqual({ type: 'nextRound' });
     expect(parseVoiceCommand('run it')).toEqual({ type: 'runIt' });
     expect(parseVoiceCommand('stack it')).toEqual({ type: 'stackBet' });
+    expect(parseVoiceCommand('stack it up')).toEqual({ type: 'stackBet' });
     expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });
     expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count', enabled: true });
     expect(parseVoiceCommand('count off')).toEqual({ type: 'count', enabled: false });

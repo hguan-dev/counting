@@ -45,9 +45,9 @@ const isSoft17 = (cards) => {
   return hardSum === 7 && aces > 0;
 };
 
-const CONFETTI_PARTICLES = Array.from({ length: 42 }, (_, index) => ({
+const CONFETTI_PARTICLES = Array.from({ length: 96 }, (_, index) => ({
   color: ['#facc15', '#fb7185', '#38bdf8', '#4ade80', '#c084fc', '#f97316'][index % 6],
-  delay: `${(index % 7) * 32}ms`,
+  delay: `${(index % 12) * 28}ms`,
   drift: `${((index * 47) % 220) - 110}px`,
   left: `${3 + ((index * 37) % 94)}%`,
   rotation: `${180 + ((index * 83) % 540)}deg`,
@@ -1187,7 +1187,7 @@ export default function App() {
           <text className="table-rule-copy table-rule-copy-left" dy="-13">
             <textPath href="#table-rule-path" startOffset="19%" textAnchor="middle">INSURANCE PAYS 2 TO 1</textPath>
           </text>
-          <text className="table-rule-copy table-rule-copy-center" dy="-15">
+          <text className="table-rule-copy table-rule-copy-center" dy="-23">
             <textPath href="#table-rule-path" startOffset="50%" textAnchor="middle">BLACKJACK PAYS 3 TO 2</textPath>
           </text>
           <text className="table-rule-copy table-rule-copy-right" dy="-13">

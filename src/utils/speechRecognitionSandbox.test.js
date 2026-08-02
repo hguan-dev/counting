@@ -21,6 +21,7 @@ const COMMAND_CASES = [
   ['next', { type: 'nextRound' }],
   ['run it', { type: 'runIt' }],
   ['stack it', { type: 'stackBet' }],
+  ['stack it up', { type: 'stackBet' }],
   ['bang', { type: 'celebrate' }],
   ['two spots bet twenty five and fifty', {
     type: 'configureBets',
