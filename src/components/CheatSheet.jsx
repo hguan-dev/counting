@@ -23,6 +23,20 @@ const pairRows = [
   ['2,2 / 3,3', 'Split vs 2–7'],
 ];
 
+const surrenderRows = [
+  ['Hard 15', 'Surrender vs 10 at TC 0+; vs Ace at TC +1+'],
+  ['Hard 16 (not 8,8)', 'Surrender vs 9, 10, or Ace'],
+  ['Hard 17', 'Surrender vs Ace'],
+  ['8,8', 'Surrender vs Ace; split against other upcards'],
+];
+
+const surrenderDeviationRows = [
+  ['15 vs 10', 'TC 0+'],
+  ['15 vs Ace', 'TC +1+'],
+  ['15 vs 9', 'TC +2+'],
+  ['14 vs 10', 'TC +3+'],
+];
+
 const countRows = [
   ['2–6', '+1', 'Low cards leaving the shoe favor the player'],
   ['7–9', '0', 'Neutral'],
@@ -111,6 +125,12 @@ export default function CheatSheet({ onClose }) {
               <GuideTable rows={pairRows} headings={['Pair', 'Best play']} />
             </section>
 
+            <section>
+              <h3>Late surrender</h3>
+              <p className="section-intro">Available only on the original two-card hand after the dealer checks for blackjack. You forfeit half your wager and the hand ends.</p>
+              <GuideTable rows={surrenderRows} headings={['Your hand', 'Surrender when']} />
+            </section>
+
             <details>
               <summary>Key count deviations in this trainer</summary>
               <ul className="guide-list">
@@ -120,6 +140,8 @@ export default function CheatSheet({ onClose }) {
                 <li><strong>10 vs 10:</strong> double at true count +4 or higher.</li>
                 <li><strong>11 vs Ace:</strong> double at true count +1 or higher.</li>
               </ul>
+              <h4>Fabulous 4 surrender indices</h4>
+              <GuideTable rows={surrenderDeviationRows} headings={['Matchup', 'Surrender at']} />
             </details>
           </>
         )}
@@ -142,7 +164,7 @@ export default function CheatSheet({ onClose }) {
                 <div><strong>Double</strong><span>Double the wager, take exactly one card, then stand.</span></div>
                 <div><strong>Split</strong><span>Turn a pair into two separately wagered hands.</span></div>
                 <div><strong>Insurance</strong><span>A side bet that the dealer has blackjack. Usually a poor bet without a count edge.</span></div>
-                <div><strong>Surrender</strong><span>Forfeit half the wager where offered. Not available in this trainer yet.</span></div>
+                <div><strong>Late surrender</strong><span>After the dealer checks for blackjack, forfeit half the original wager and end the hand.</span></div>
               </div>
             </section>
 
@@ -166,6 +188,7 @@ export default function CheatSheet({ onClose }) {
                 <li>Double after split is allowed.</li>
                 <li>Pairs may be resplit to a maximum of four hands.</li>
                 <li>Split Aces receive one card each.</li>
+                <li>Late surrender is allowed on an unsplit original two-card hand.</li>
               </ul>
             </details>
 
@@ -185,7 +208,7 @@ export default function CheatSheet({ onClose }) {
               <ul className="guide-list">
                 <li>Enable <strong>Voice mode</strong> once, then say “help” at any time.</li>
                 <li>Configure unequal wagers naturally: “two spots, bet 25 and 50.”</li>
-                <li>Every round decision is supported: hit, stand, double, split, insurance, even money, and next round.</li>
+                <li>Every round decision is supported: hit, stand, double, split, surrender, insurance, even money, and next round.</li>
                 <li>Say “status,” “bankroll,” or “count” to hear the current table state.</li>
                 <li>Say “microphone test” to confirm that speech is detected, transcribed, and matched end to end.</li>
                 <li>Spoken prompts pause microphone listening while the dealer talks, then resume automatically.</li>

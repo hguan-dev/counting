@@ -9,8 +9,10 @@ export default function GameControls({
   onStand,
   onDouble,
   onSplit,
+  onSurrender,
   canDouble,
   canSplit,
+  canSurrender,
   canResplit,
   hintedAction,
   onInsurance,
@@ -96,6 +98,15 @@ export default function GameControls({
             >
               <span>{canResplit ? 'Resplit' : 'Split'}</span>
               {hintedAction === 'split' && <small>Recommended</small>}
+            </button>
+          )}
+          {canSurrender && (
+            <button
+              className={`action-button is-surrender ${hintedAction === 'surrender' ? 'is-hinted' : ''}`}
+              onClick={onSurrender}
+            >
+              <span>Surrender</span>
+              {hintedAction === 'surrender' && <small>Recommended</small>}
             </button>
           )}
         </div>

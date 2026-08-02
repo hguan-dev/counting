@@ -64,6 +64,26 @@ export const canSplitHand = (hand) => (
   && getNumericValue(hand.cards[0]) === getNumericValue(hand.cards[1])
 );
 
+export const canSurrenderHand = (hand) => (
+  Boolean(hand)
+  && hand.status === 'playing'
+  && hand.cards.length === 2
+  && !hand.isSplitHand
+  && !hand.isDoubled
+);
+
+export const surrenderHand = (hand) => {
+  if (!canSurrenderHand(hand)) throw new Error('Hand cannot be surrendered');
+  return {
+    hand: {
+      ...hand,
+      outcome: 'surrender',
+      status: 'surrendered',
+    },
+    returnAmount: hand.bet / 2,
+  };
+};
+
 export const splitHand = (hand, drawCard) => {
   if (!canSplitHand(hand)) throw new Error('Hand cannot be split');
 

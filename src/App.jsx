@@ -3,6 +3,7 @@ import { Shoe } from './models/Shoe';
 import { calculateTotal, getDetailedPlay } from './utils/strategyEngine';
 import {
   applyEvenMoneyDecision,
+  canSurrenderHand,
   canSplitHand,
   findNextPlayableHand,
   getEvenMoneyOffers,
@@ -10,6 +11,7 @@ import {
   getNaturalBlackjackSettlement,
   isNaturalBlackjack,
   splitHand,
+  surrenderHand,
 } from './utils/handRules';
 import { GameLogger } from './utils/logger';
 import CheatSheet from './components/CheatSheet';
@@ -18,7 +20,6 @@ import GameControls from './components/GameControls';
 import PlayingCard from './components/PlayingCard';
 import useTableVoice from './hooks/useTableVoice';
 import {
-  getDealerCardCall,
   getDealerFinishCall,
   getSpokenCard,
   getSpokenCountSummary,
@@ -178,6 +179,7 @@ export default function App() {
       spot.subHands.forEach((hand, handIndex) => {
         let returnAmount = 0;
         if (hand.outcome === 'push') returnAmount = hand.bet;
+        if (hand.outcome === 'surrender') returnAmount = hand.bet / 2;
         if (hand.outcome === 'win') {
           returnAmount = isNaturalBlackjack(hand) && !hand.evenMoneyAccepted
             ? hand.bet * 2.5
@@ -364,7 +366,7 @@ export default function App() {
       setGameState('resolved');
       logRoundResults([d1, d2], spots);
       playSound('win');
-      announce(`Dealer upcard ${getSpokenCard(d1)}. Player blackjack. Round complete.`, { listenAfter: true });
+      announce(`Dealer ${getSpokenCard(d1)}. Player blackjack. Round complete.`, { listenAfter: true });
     } else {
       findFirstActiveHand(
         spots,
@@ -372,7 +374,7 @@ export default function App() {
         0,
         payoutReturn,
         totalWager,
-        `Dealer upcard ${getSpokenCard(d1)}.`,
+        `Dealer ${getSpokenCard(d1)}.`,
       );
     }
   };
@@ -544,19 +546,13 @@ export default function App() {
     if (total > 21) {
       hand.status = 'bust';
       hand.outcome = 'loss';
-      advancePointer(spots, false, `Player draws ${getSpokenCard(drawnCard)} and busts with ${total}.`);
+      advancePointer(spots, false, 'Too many. Player busts.');
     } else if (total === 21 || hand.isSplitAce) {
       hand.status = 'stood';
-      advancePointer(spots, false, `Player draws ${getSpokenCard(drawnCard)} and has ${total}.`);
+      advancePointer(spots, false, `Total ${getSpokenHandTotal(hand.cards)}.`);
     } else {
       setPlayerSpots(spots);
-      announce(
-        [
-          `Player draws ${getSpokenCard(drawnCard)}.`,
-          `Total ${getSpokenHandTotal(hand.cards)}.`,
-        ],
-        { listenAfter: true },
-      );
+      announce(`Total ${getSpokenHandTotal(hand.cards)}.`, { listenAfter: true });
     }
   };
 
@@ -577,6 +573,37 @@ export default function App() {
       },
     );
     advancePointer(spots, false, `Player stands on ${getSpokenHandTotal(hand.cards)}.`);
+  };
+
+  const executeSurrender = () => {
+    const spots = JSON.parse(JSON.stringify(playerSpots));
+    const current = spots[activeSpotIndex]?.subHands[activeSubHandIndex];
+    if (!canSurrenderHand(current)) {
+      announce('Late surrender is only available on the original two-card hand.', {
+        listenAfter: true,
+      });
+      return;
+    }
+
+    const settlement = surrenderHand(current);
+    spots[activeSpotIndex].subHands[activeSubHandIndex] = settlement.hand;
+    setBankroll(currentBankroll => currentBankroll + settlement.returnAmount);
+    playSound('stand');
+    loggerRef.current.log(
+      'SURRENDER',
+      `Spot ${activeSpotIndex + 1}, hand ${activeSubHandIndex + 1} surrendered for a $${settlement.returnAmount} return.`,
+      {
+        hand: activeSubHandIndex + 1,
+        net: -settlement.returnAmount,
+        outcome: 'surrender',
+        playerCards: formatCards(current.cards),
+        playerTotal: calculateTotal(current.cards),
+        returnAmount: settlement.returnAmount,
+        spot: activeSpotIndex + 1,
+        wager: current.bet,
+      },
+    );
+    advancePointer(spots, false, 'Hand surrendered. Half the wager returned.');
   };
 
   const executeDouble = (faceDown = false) => {
@@ -622,7 +649,7 @@ export default function App() {
       false,
       faceDown
         ? 'Player doubles. Card face down.'
-        : `Player doubles and draws ${getSpokenCard(drawnCard)} for ${total}.`,
+        : total > 21 ? 'Too many. Player busts.' : `Total ${getSpokenHandTotal(hand.cards)}.`,
     );
   };
 
@@ -661,7 +688,7 @@ export default function App() {
     advancePointer(
       spots,
       true,
-      `Cards split. First hand draws ${getSpokenCard(drawnCards[0])}. Second hand draws ${getSpokenCard(drawnCards[1])}.`,
+      'Cards split.',
     );
   };
 
@@ -692,7 +719,6 @@ export default function App() {
 
     let dHand = [...dInitialHand];
     await new Promise(r => setTimeout(r, 650));
-    await announce(getDealerCardCall(dHand[1]));
 
     const dealerHasBlackjack = calculateTotal(dHand) === 21 && dHand.length === 2;
     const needsDealerDraw = spots.some(spot => spot.subHands.some(hand => (
@@ -708,7 +734,6 @@ export default function App() {
         shoeRef.current.visibleRunningCount += drawnCard.countValue;
         dHand.push(drawnCard);
         setDealerHand([...dHand]);
-        await announce(getDealerCardCall(drawnCard));
       }
     }
 
@@ -734,10 +759,11 @@ export default function App() {
       setPlayerSpots(revealedSpots);
       playSound('card');
       await new Promise(r => setTimeout(r, 950));
-      await announce(faceDownDoubles.map(({ hand, handIndex, spotIndex }) => {
-        const doubleCard = hand.cards[hand.cards.length - 1];
-        return `Spot ${spotIndex + 1}, hand ${handIndex + 1}, ${getSpokenCard(doubleCard)}. Total ${getSpokenHandTotal(hand.cards)}.`;
-      }));
+      await announce(faceDownDoubles.map(({ hand }) => (
+        calculateTotal(hand.cards) > 21
+          ? 'Too many. Player busts.'
+          : `Total ${getSpokenHandTotal(hand.cards)}.`
+      )));
     }
 
     resolveRound(dHand, revealedSpots, insBets, presetWinnings, totalWager);
@@ -756,6 +782,10 @@ export default function App() {
       spot.subHands.forEach((hand) => {
         const pTotal = calculateTotal(hand.cards);
         const isNaturalBJ = isNaturalBlackjack(hand);
+        if (hand.status === 'surrendered') {
+          hand.outcome = 'surrender';
+          return;
+        }
         if (isNaturalBJ) {
           hand.outcome = 'win';
           return;
@@ -804,6 +834,7 @@ export default function App() {
     if (actionType === 'double') return executeDouble(false);
     if (actionType === 'doubleFaceDown') return executeDouble(true);
     if (actionType === 'split') return executeSplit();
+    if (actionType === 'surrender') return executeSurrender();
     return undefined;
   };
 
@@ -812,7 +843,12 @@ export default function App() {
     const curHand = getCurrentActiveHand();
     if (!warnStrategy) return executeRequestedAction(actionType);
 
-    const evaluation = getDetailedPlay(curHand.cards, dealerHand[0], shoeRef.current.trueCount);
+    const evaluation = getDetailedPlay(
+      curHand.cards,
+      dealerHand[0],
+      shoeRef.current.trueCount,
+      { allowSurrender: canSurrenderHand(curHand) },
+    );
     let optimal = evaluation.action;
     if (optimal === 'double' && curHand.cards.length > 2) optimal = calculateTotal(curHand.cards) >= 18 ? 'stand' : 'hit';
     const strategyAction = actionType === 'doubleFaceDown' ? 'double' : actionType;
@@ -989,7 +1025,7 @@ export default function App() {
 
     if (command.type === 'help') {
       announce(
-        'You can set one or two spots with separate wagers, deal, hit, stand, face up double, face down double, split, buy or decline insurance, take or decline even money, say run it, next, stack it, bang, toggle the count, dealer voice, or study guide, reload funds, or ask for a strategy tip, bankroll, or status.',
+        'You can set one or two spots with separate wagers, deal, hit, stand, double, split, surrender, buy or decline insurance, take or decline even money, say run it, next, stack it, bang, toggle the count, dealer voice, or study guide, reload funds, or ask for a strategy tip, bankroll, or status.',
         { listenAfter: true },
       );
       return;
@@ -1015,7 +1051,12 @@ export default function App() {
         announce('Strategy advice is available during an active player hand.', { listenAfter: true });
         return;
       }
-      const evaluation = getDetailedPlay(hand.cards, dealerHand[0], shoeRef.current.trueCount);
+      const evaluation = getDetailedPlay(
+        hand.cards,
+        dealerHand[0],
+        shoeRef.current.trueCount,
+        { allowSurrender: canSurrenderHand(hand) },
+      );
       let recommendedAction = evaluation.action;
       if (recommendedAction === 'double' && hand.cards.length > 2) {
         recommendedAction = calculateTotal(hand.cards) >= 18 ? 'stand' : 'hit';
@@ -1135,6 +1176,10 @@ export default function App() {
         announce('Double is not available after a hit.', { listenAfter: true });
       } else if (command.action === 'split' && !canSplitCurrent()) {
         announce('Split is not available for this hand.', { listenAfter: true });
+      } else if (command.action === 'surrender' && !canSurrenderHand(getCurrentActiveHand())) {
+        announce('Late surrender is only available on the original two-card hand.', {
+          listenAfter: true,
+        });
       } else {
         handleAction(command.action);
       }
@@ -1195,6 +1240,7 @@ export default function App() {
     } else if (command.type === 'action') {
       if (command.action === 'double' && getCurrentActiveHand()?.cards.length !== 2) return;
       if (command.action === 'split' && !canSplitCurrent()) return;
+      if (command.action === 'surrender' && !canSurrenderHand(getCurrentActiveHand())) return;
       handleAction(command.action);
     } else if (command.type === 'insurance') {
       executeInsurance(command.buy);
@@ -1637,7 +1683,10 @@ export default function App() {
                               </span>
                               <strong>{hand.doubleCardFaceDown ? '—' : calculateTotal(hand.cards)}</strong>
                               </div>
-                            {renderChipStack(hand.bet, hand.outcome)}
+                            {renderChipStack(
+                              hand.outcome === 'surrender' ? hand.bet / 2 : hand.bet,
+                              hand.outcome,
+                            )}
                           </div>
                         );
                       })}
@@ -1673,8 +1722,10 @@ export default function App() {
           onStand={() => handleAction('stand')}
           onDouble={() => handleAction('double')}
           onSplit={() => handleAction('split')}
+          onSurrender={() => handleAction('surrender')}
           canDouble={getCurrentActiveHand()?.cards.length === 2}
           canSplit={canSplitCurrent()}
+          canSurrender={canSurrenderHand(getCurrentActiveHand())}
           canResplit={(playerSpots[activeSpotIndex]?.subHands.length || 0) > 1}
           hintedAction={hintedAction}
           onInsurance={executeInsurance}

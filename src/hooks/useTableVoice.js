@@ -289,7 +289,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       const voice = availableVoices.find(item => item.name === selectedVoiceNameRef.current)
         || choosePreferredTableVoice(availableVoices);
       if (voice) utterance.voice = voice;
-      utterance.rate = 0.88;
+      utterance.rate = 1.05;
       utterance.pitch = 0.94;
       utterance.volume = 0.95;
       utterance.onend = beginListening;

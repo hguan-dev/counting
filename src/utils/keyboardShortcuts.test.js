@@ -8,6 +8,7 @@ describe('getKeyboardCommand', () => {
     ['s', 'stand'],
     ['d', 'double'],
     ['p', 'split'],
+    ['r', 'surrender'],
   ])('maps %s to %s during player action', (key, action) => {
     expect(getKeyboardCommand(key, 'playing')).toEqual({ type: 'action', action });
   });

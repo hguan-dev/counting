@@ -50,10 +50,29 @@ describe('Blackjack Engine Logic & Strategy Tests', () => {
     expect(getDetailedPlay(playerHand, dealerUpCard, 0).action).toBe('stand');
   });
 
-  test('Strategy engine: Illustrious 18 deviation 16 vs 10 at TC >= 0', () => {
+  test('Strategy engine: late surrender takes priority on an eligible 16 vs 10', () => {
     const playerHand = [new Card('♥', '10'), new Card('♠', '6')];
     const dealerUpCard = new Card('♦', '10');
-    expect(getDetailedPlay(playerHand, dealerUpCard, 0).action).toBe('stand');
+    expect(getDetailedPlay(playerHand, dealerUpCard, 0).action).toBe('surrender');
+    expect(getDetailedPlay(
+      playerHand,
+      dealerUpCard,
+      0,
+      { allowSurrender: false },
+    ).action).toBe('stand');
+  });
+
+  test('Strategy engine: applies H17 surrender and Fabulous 4 indices', () => {
+    const ten = new Card('♦', '10');
+    const ace = new Card('♦', 'A');
+    const nine = new Card('♦', '9');
+
+    expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '5')], ten, 0).action).toBe('surrender');
+    expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '5')], ace, 0).action).toBe('hit');
+    expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '5')], ace, 1).action).toBe('surrender');
+    expect(getDetailedPlay([new Card('♥', '8'), new Card('♠', '8')], ace, 0).action).toBe('surrender');
+    expect(getDetailedPlay([new Card('♥', '8'), new Card('♠', '8')], nine, 0).action).toBe('split');
+    expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '4')], ten, 3).action).toBe('surrender');
   });
 
   test('Strategy engine: always splits aces and eights', () => {

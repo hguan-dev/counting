@@ -14,6 +14,7 @@ let activeObjectUrl = null;
 let activeResolve = null;
 let speechRun = 0;
 let workerRequestId = 0;
+export const KOKORO_PLAYBACK_RATE = 1.12;
 const workerRequests = new Map();
 const audioBlobPromises = new Map();
 const heartAssetIndex = new Map(
@@ -135,6 +136,8 @@ export const speakWithKokoro = async (text, voice, onProgress, onAudioStart) => 
     if (currentRun !== speechRun) return;
     const objectUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(objectUrl);
+    audio.playbackRate = KOKORO_PLAYBACK_RATE;
+    audio.preservesPitch = true;
     activeAudio = audio;
     activeObjectUrl = objectUrl;
     if (!started) {

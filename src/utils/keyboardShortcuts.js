@@ -2,6 +2,7 @@ const PLAYING_SHORTCUTS = {
   d: 'double',
   h: 'hit',
   p: 'split',
+  r: 'surrender',
   s: 'stand',
 };
 

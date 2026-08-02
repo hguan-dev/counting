@@ -20,12 +20,38 @@ const getNumericValue = (card) => (
     : (['J', 'Q', 'K'].includes(card.value) ? 10 : card.value === 'A' ? 11 : Number(card.value))
 );
 
-export const getDetailedPlay = (pCards, dUpCard, tc) => {
+export const getDetailedPlay = (pCards, dUpCard, tc, { allowSurrender = true } = {}) => {
   const dValue = getNumericValue(dUpCard);
   const d = dValue === 11 ? 11 : dValue;
   const p = calculateTotal(pCards);
   const isPair = pCards.length === 2 && getNumericValue(pCards[0]) === getNumericValue(pCards[1]);
   const isSoft = pCards.length === 2 && pCards.some(c => c.value === 'A') && p <= 21;
+  const isPairOfEights = isPair && getNumericValue(pCards[0]) === 8;
+
+  // Six-deck H17 late surrender, including Hi-Lo Fabulous 4 indices.
+  if (allowSurrender && pCards.length === 2 && !isSoft) {
+    if (isPairOfEights && d === 11) {
+      return { action: 'surrender', type: 'Basic Strategy', rule: 'Surrender 8s against an Ace in this six-deck H17 game.' };
+    }
+    if (!isPairOfEights && p === 16 && d >= 9) {
+      return { action: 'surrender', type: 'Basic Strategy', rule: 'Surrender hard 16 against 9, 10, or Ace.' };
+    }
+    if (p === 17 && d === 11) {
+      return { action: 'surrender', type: 'Basic Strategy', rule: 'Surrender hard 17 against an Ace when the dealer hits soft 17.' };
+    }
+    if (p === 15 && d === 10 && tc >= 0) {
+      return { action: 'surrender', type: 'Deviation (Fabulous 4)', rule: 'Surrender 15 vs 10 at TC ≥ 0.' };
+    }
+    if (p === 15 && d === 11 && tc >= 1) {
+      return { action: 'surrender', type: 'Deviation (Fabulous 4)', rule: 'Surrender 15 vs Ace at TC ≥ +1.' };
+    }
+    if (p === 15 && d === 9 && tc >= 2) {
+      return { action: 'surrender', type: 'Deviation (Fabulous 4)', rule: 'Surrender 15 vs 9 at TC ≥ +2.' };
+    }
+    if (p === 14 && d === 10 && tc >= 3) {
+      return { action: 'surrender', type: 'Deviation (Fabulous 4)', rule: 'Surrender 14 vs 10 at TC ≥ +3.' };
+    }
+  }
 
   // Illustrious 18 Deviations
   if (!isPair && p === 16 && d === 10 && tc >= 0) return { action: 'stand', type: 'Deviation (Illustrious 18)', rule: 'Stand on 16 vs 10 at TC ≥ 0.' };

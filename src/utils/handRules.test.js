@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { Card } from '../models/Card';
 import {
   applyEvenMoneyDecision,
+  canSurrenderHand,
   canSplitHand,
   findNextPlayableHand,
   getEvenMoneyOffers,
@@ -9,6 +10,7 @@ import {
   getNaturalBlackjackSettlement,
   isNaturalBlackjack,
   splitHand,
+  surrenderHand,
 } from './handRules';
 
 const playingHand = (cards, overrides = {}) => ({
@@ -110,6 +112,43 @@ describe('split hand rules', () => {
     expect(findNextPlayableHand(spots, 0, 0)).toEqual({ spotIndex: 1, handIndex: 0 });
     playing.status = 'stood';
     expect(findNextPlayableHand(spots, 0, 0)).toBeNull();
+  });
+});
+
+describe('late surrender', () => {
+  test('allows only an original untouched two-card hand', () => {
+    const original = playingHand([new Card('♥', '10'), new Card('♠', '6')]);
+    expect(canSurrenderHand(original)).toBe(true);
+    expect(canSurrenderHand({ ...original, isSplitHand: true })).toBe(false);
+    expect(canSurrenderHand({ ...original, isDoubled: true })).toBe(false);
+    expect(canSurrenderHand({
+      ...original,
+      cards: [...original.cards, new Card('♦', '2')],
+    })).toBe(false);
+  });
+
+  test('ends the hand and returns exactly half the original wager', () => {
+    const original = playingHand(
+      [new Card('♥', '10'), new Card('♠', '6')],
+      { bet: 35 },
+    );
+    expect(surrenderHand(original)).toEqual({
+      hand: {
+        ...original,
+        outcome: 'surrender',
+        status: 'surrendered',
+      },
+      returnAmount: 17.5,
+    });
+    expect(original.status).toBe('playing');
+  });
+
+  test('rejects an ineligible surrender', () => {
+    const split = playingHand(
+      [new Card('♥', '8'), new Card('♠', '10')],
+      { isSplitHand: true },
+    );
+    expect(() => surrenderHand(split)).toThrow('Hand cannot be surrendered');
   });
 });
 

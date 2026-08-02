@@ -1,7 +1,12 @@
 import { readFile, stat } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
 import { DEALER_CARD_CALLS, HEART_TABLE_PHRASES } from './heartVoicePhrases';
-import { KOKORO_VOICES, preloadKokoro, preloadKokoroVoice } from './kokoroVoice';
+import {
+  KOKORO_PLAYBACK_RATE,
+  KOKORO_VOICES,
+  preloadKokoro,
+  preloadKokoroVoice,
+} from './kokoroVoice';
 
 describe('Kokoro dealer voices', () => {
   test('offers a small, curated set with unique model voice IDs', () => {
@@ -15,6 +20,7 @@ describe('Kokoro dealer voices', () => {
     expect(KOKORO_VOICES.every(voice => !/grade/i.test(voice.label))).toBe(true);
     expect(preloadKokoro).toBeTypeOf('function');
     expect(preloadKokoroVoice).toBeTypeOf('function');
+    expect(KOKORO_PLAYBACK_RATE).toBeGreaterThan(1);
   });
 
   test('precomputes the reusable Heart table vocabulary without duplicates', () => {

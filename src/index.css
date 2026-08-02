@@ -584,7 +584,11 @@ button:disabled {
 
 .card-row {
   min-height: 125px;
-  gap: 0.7rem;
+  gap: 0;
+}
+
+.dealer-cards .playing-card + .playing-card {
+  margin-left: -22px;
 }
 
 .playing-card {
@@ -757,6 +761,11 @@ button:disabled {
 
 .player-hand.is-loss {
   border-color: rgba(247, 113, 113, 0.38);
+}
+
+.player-hand.is-surrender {
+  border-color: rgba(251, 191, 36, 0.42);
+  background: rgba(120, 74, 12, 0.12);
 }
 
 .hand-meta {
@@ -976,7 +985,8 @@ button:disabled {
 }
 
 .action-button.is-double,
-.action-button.is-split {
+.action-button.is-split,
+.action-button.is-surrender {
   border-color: rgba(232, 197, 106, 0.42);
   color: var(--gold-soft);
 }
@@ -1509,21 +1519,22 @@ button:disabled {
 
   .game-board {
     width: 100%;
-    min-height: 570px;
-    padding: 4.2rem 0.65rem 1rem;
+    min-height: 470px;
+    padding: 3.65rem 0.55rem 0.7rem;
     border-radius: 70px 70px 16px 16px / 28px 28px 16px 16px;
+    gap: 0.65rem !important;
   }
 
   .game-board.is-betting {
-    min-height: 420px;
+    min-height: 330px;
   }
 
   .game-board.is-betting .hand-zone {
-    min-height: 112px;
+    min-height: 82px;
   }
 
   .game-board.is-betting .player-zone {
-    min-height: 128px;
+    min-height: 90px;
   }
 
   .table-rule-arc {
@@ -1541,7 +1552,20 @@ button:disabled {
   }
 
   .dealer-zone {
-    margin-top: 1.2rem;
+    min-height: 108px;
+    margin-top: 0.45rem;
+  }
+
+  .player-zone {
+    min-height: 140px;
+  }
+
+  .zone-label {
+    margin-bottom: 0.35rem;
+  }
+
+  .card-row {
+    min-height: 88px;
   }
 
   .player-spots {
@@ -1556,16 +1580,34 @@ button:disabled {
   }
 
   .player-hand {
-    min-width: 132px;
-    padding-inline: 0.45rem;
+    min-width: 112px;
+    padding: 0.45rem 0.35rem 0.35rem;
   }
 
   .playing-card {
-    width: 76px;
+    width: 60px;
   }
 
   .playing-card.is-compact {
-    width: 62px;
+    width: 50px;
+  }
+
+  .dealer-cards .playing-card + .playing-card {
+    margin-left: -18px;
+  }
+
+  .hand-cards .playing-card + .playing-card {
+    margin-left: -14px;
+  }
+
+  .hand-total {
+    margin-top: 0.3rem;
+  }
+
+  .chip-stack-container {
+    margin-top: 4px !important;
+    transform: scale(0.82);
+    transform-origin: top center;
   }
 
   .betting-prompt {

@@ -48,7 +48,7 @@ export const getDealerCardCall = (card) => `${getSpokenCard(card)}.`;
 
 export const getDealerFinishCall = (cards) => {
   const total = calculateTotal(cards);
-  return total > 21 ? 'Too many. Dealer busts.' : `Dealer ${total}.`;
+  return total > 21 ? 'Too many.' : `Dealer ${total}.`;
 };
 
 export const getSpokenHandTotal = (cards) => {
@@ -191,6 +191,7 @@ export const parseVoiceCommand = (transcript) => {
   if (/\b(stand|stay|hold)\b/.test(normalized)) return { type: 'action', action: 'stand' };
   if (/\bdouble(?:\s+down)?\b/.test(normalized)) return { type: 'action', action: 'double' };
   if (/\b(?:split|resplit)\b/.test(normalized)) return { type: 'action', action: 'split' };
+  if (/\bsurrender\b/.test(normalized)) return { type: 'action', action: 'surrender' };
   if (/\brun\s+it\b/.test(normalized)) return { type: 'runIt' };
   if (/\bstack\s+it\s+up\b/.test(normalized)) return { type: 'stackAndRun' };
   if (/\bstack\s+it\b/.test(normalized)) return { type: 'stackBet' };

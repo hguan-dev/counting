@@ -41,7 +41,7 @@ describe('table speech', () => {
       new Card('♠', '4'),
       new Card('♦', '3'),
       new Card('♣', '10'),
-    ])).toBe('Too many. Dealer busts.');
+    ])).toBe('Too many.');
     expect(getDealerFinishCall([
       new Card('♥', '10'),
       new Card('♠', '7'),
@@ -81,6 +81,7 @@ describe('table speech', () => {
   test('parses every table decision and utility command', () => {
     expect(parseVoiceCommand('double down')).toEqual({ type: 'action', action: 'double' });
     expect(parseVoiceCommand('resplit')).toEqual({ type: 'action', action: 'split' });
+    expect(parseVoiceCommand('surrender')).toEqual({ type: 'action', action: 'surrender' });
     expect(parseVoiceCommand('buy insurance')).toEqual({ type: 'insurance', buy: true });
     expect(parseVoiceCommand('no insurance')).toEqual({ type: 'insurance', buy: false });
     expect(parseVoiceCommand('take even money')).toEqual({ type: 'evenMoney', accept: true });
