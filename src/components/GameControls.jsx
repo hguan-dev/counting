@@ -14,44 +14,55 @@ export default function GameControls({
   onInsurance,
   onNextRound
 }) {
-  const inputStyle = { padding: '0.7rem', width: '100px', textAlign: 'center', borderRadius: '8px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' };
-  const actionBtnStyle = { padding: '0.8rem 2.2rem', fontSize: '1.05rem', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', cursor: 'pointer' };
-
   return (
-    <div className="game-controls" aria-label="Game controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(0, 0, 0, 0.4)', padding: '1.2rem 2.5rem', borderRadius: '16px', gap: '1.5rem', minHeight: '80px' }}>
+    <div className="game-controls" aria-label="Game controls">
       {gameState === 'betting' && (
-        <>
-          <label htmlFor="wager">Wager</label>
-          <input id="wager" aria-label="Wager amount" type="number" value={initialBet} onChange={(e) => setInitialBet(Number(e.target.value))} step="25" min="25" style={inputStyle} />
-          <label htmlFor="spots">Spots</label>
-          <select id="spots" aria-label="Number of spots" value={numHands} onChange={(e) => setNumHands(Number(e.target.value))} style={{ ...inputStyle, width: '70px' }}>
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-          </select>
-          <button onClick={onDeal} style={{ ...actionBtnStyle, background: '#2ecc71', color: '#000', fontWeight: '600' }}>DEAL</button>
-        </>
+        <div className="betting-controls">
+          <label className="control-field" htmlFor="wager">
+            <span>Wager per spot</span>
+            <span className="control-input has-prefix">
+              <b>$</b>
+              <input id="wager" aria-label="Wager amount" type="number" value={initialBet} onChange={(e) => setInitialBet(Number(e.target.value))} step="25" min="25" />
+            </span>
+          </label>
+          <label className="control-field" htmlFor="spots">
+            <span>Player spots</span>
+            <select id="spots" aria-label="Number of spots" value={numHands} onChange={(e) => setNumHands(Number(e.target.value))}>
+              <option value={1}>1 spot</option>
+              <option value={2}>2 spots</option>
+            </select>
+          </label>
+          <button className="deal-button" onClick={onDeal}>
+            <span>Deal cards</span>
+            <small>${initialBet * numHands} total</small>
+          </button>
+        </div>
       )}
 
       {gameState === 'insurance' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <span style={{ color: '#f1c40f', fontWeight: '500' }}>Dealer shows an Ace. Take Insurance?</span>
-          <button onClick={() => onInsurance(true)} style={{ ...actionBtnStyle, background: '#f1c40f', color: '#000', fontWeight: '600' }}>Yes (Pay 2:1)</button>
-          <button onClick={() => onInsurance(false)} style={actionBtnStyle}>Decline</button>
+        <div className="insurance-controls">
+          <div className="decision-copy">
+            <span className="decision-kicker">Dealer shows an Ace</span>
+            <strong>Insure eligible hands?</strong>
+            <small>Costs half your wager. Pays 2:1 only if the dealer has blackjack.</small>
+          </div>
+          <button className="decision-button is-gold" onClick={() => onInsurance(true)}>Buy insurance</button>
+          <button className="decision-button" onClick={() => onInsurance(false)}>No insurance</button>
         </div>
       )}
 
       {gameState === 'playing' && (
-        <>
-          <button onClick={onHit} style={actionBtnStyle}>Hit</button>
-          <button onClick={onStand} style={actionBtnStyle}>Stand</button>
-          {canDouble && <button onClick={onDouble} style={actionBtnStyle}>Double</button>}
-          {canSplit && <button onClick={onSplit} style={actionBtnStyle}>Split</button>}
-        </>
+        <div className="action-cluster">
+          <button className="action-button is-hit" onClick={onHit}><span>Hit</span><small>Take a card</small></button>
+          <button className="action-button is-stand" onClick={onStand}><span>Stand</span><small>Hold total</small></button>
+          {canDouble && <button className="action-button is-double" onClick={onDouble}><span>Double</span><small>One card</small></button>}
+          {canSplit && <button className="action-button is-split" onClick={onSplit}><span>Split</span><small>Two hands</small></button>}
+        </div>
       )}
 
       {(gameState === 'resolved' || gameState === 'dealerRevealing' || gameState === 'shuffling') && gameState !== 'insurance' && gameState !== 'playing' && gameState !== 'betting' && (
-        <button onClick={onNextRound} disabled={gameState === 'dealerRevealing' || gameState === 'shuffling'} style={{ ...actionBtnStyle, background: '#f1c40f', color: '#000', fontWeight: '600', opacity: gameState === 'dealerRevealing' ? 0.5 : 1 }}>
-          {gameState === 'shuffling' ? 'SHUFFLING SHOE...' : gameState === 'dealerRevealing' ? 'DEALER REVEALING...' : 'DEAL NEXT ROUND'}
+        <button className="next-round-button" onClick={onNextRound} disabled={gameState === 'dealerRevealing' || gameState === 'shuffling'}>
+          {gameState === 'shuffling' ? 'Shuffling shoe…' : gameState === 'dealerRevealing' ? 'Dealer revealing…' : 'Deal next round'}
         </button>
       )}
     </div>

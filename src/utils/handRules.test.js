@@ -1,8 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Card } from '../models/Card';
 import {
+  applyEvenMoneyDecision,
   canSplitHand,
   findNextPlayableHand,
+  getEvenMoneyOffers,
+  getNaturalBlackjackSettlement,
   isNaturalBlackjack,
   splitHand,
 } from './handRules';
@@ -88,5 +91,63 @@ describe('blackjack classification', () => {
       new Card('♠', '7'),
       new Card('♦', '7'),
     ]))).toBe(false);
+  });
+});
+
+describe('per-hand even money', () => {
+  const natural = (bet = 25) => playingHand(
+    [new Card('♥', 'A'), new Card('♠', 'K')],
+    { bet },
+  );
+
+  test('creates one offer for each natural blackjack across multiple spots', () => {
+    const spots = [
+      { subHands: [natural()] },
+      { subHands: [playingHand([new Card('♦', '10'), new Card('♣', '9')])] },
+      { subHands: [natural(50)] },
+    ];
+
+    expect(getEvenMoneyOffers(spots)).toEqual([
+      { spotIndex: 0, handIndex: 0 },
+      { spotIndex: 2, handIndex: 0 },
+    ]);
+  });
+
+  test('records a decision on only the offered hand', () => {
+    const spots = [
+      { subHands: [natural()] },
+      { subHands: [natural()] },
+    ];
+    const result = applyEvenMoneyDecision(
+      spots,
+      { spotIndex: 1, handIndex: 0 },
+      true,
+    );
+
+    expect(result[0].subHands[0].evenMoneyAccepted).toBeUndefined();
+    expect(result[1].subHands[0].evenMoneyAccepted).toBe(true);
+    expect(spots[1].subHands[0].evenMoneyAccepted).toBeUndefined();
+  });
+
+  test('settles accepted and declined naturals independently', () => {
+    const accepted = { ...natural(40), evenMoneyAccepted: true };
+    const declined = { ...natural(40), evenMoneyAccepted: false };
+
+    expect(getNaturalBlackjackSettlement(accepted, false)).toEqual({
+      outcome: 'win',
+      returnAmount: 80,
+    });
+    expect(getNaturalBlackjackSettlement(accepted, true)).toEqual({
+      outcome: 'win',
+      returnAmount: 80,
+    });
+    expect(getNaturalBlackjackSettlement(declined, false)).toEqual({
+      outcome: 'win',
+      returnAmount: 100,
+    });
+    expect(getNaturalBlackjackSettlement(declined, true)).toEqual({
+      outcome: 'push',
+      returnAmount: 40,
+    });
   });
 });
