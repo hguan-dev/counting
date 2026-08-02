@@ -17,9 +17,15 @@ import PopupModal from './components/PopupModal';
 import GameControls from './components/GameControls';
 import PlayingCard from './components/PlayingCard';
 import useTableVoice from './hooks/useTableVoice';
-import { getSpokenCard, getSpokenHandTotal } from './utils/tableSpeech';
+import {
+  getDealerCardCall,
+  getDealerFinishCall,
+  getSpokenCard,
+  getSpokenHandTotal,
+} from './utils/tableSpeech';
 
 const getChipColor = (denom) => {
+  if (denom >= 1000) return '#f97316';
   if (denom >= 500) return '#a29bfe';
   if (denom >= 100) return '#111111';
   if (denom >= 25) return '#27ae60';
@@ -67,6 +73,7 @@ export default function App() {
   const {
     announce,
     availableVoices,
+    kokoroVoices,
     lastAnnouncement,
     lastHeard,
     playSound,
@@ -78,6 +85,9 @@ export default function App() {
     speechEnabled,
     toggleVoiceInput,
     voiceInputEnabled,
+    voiceError,
+    voiceModelProgress,
+    voiceModelStatus,
     voiceStatus,
     voiceSupported,
   } = useTableVoice({
@@ -251,7 +261,7 @@ export default function App() {
       setBankroll(b => b + payoutReturn);
       setGameState('resolved');
       playSound('win');
-      announce(`Dealer has a ${getSpokenCard(d1)} upcard. Player blackjack. Say next round when ready.`, { listenAfter: true });
+      announce(`Dealer upcard ${getSpokenCard(d1)}. Player blackjack. Say next round when ready.`, { listenAfter: true });
     } else {
       findFirstActiveHand(
         spots,
@@ -259,7 +269,7 @@ export default function App() {
         0,
         payoutReturn,
         totalWager,
-        `Dealer has a ${getSpokenCard(d1)} upcard.`,
+        `Dealer upcard ${getSpokenCard(d1)}.`,
       );
     }
   };
@@ -513,7 +523,7 @@ export default function App() {
 
     let dHand = [...dInitialHand];
     await new Promise(r => setTimeout(r, 1000));
-    announce(`Dealer reveals ${getSpokenCard(dHand[1])}. Dealer has ${getSpokenHandTotal(dHand)}.`);
+    await announce(getDealerCardCall(dHand[1]));
 
     const dealerHasBlackjack = calculateTotal(dHand) === 21 && dHand.length === 2;
     const needsDealerDraw = spots.some(spot => spot.subHands.some(h => h.status === 'stood' && !isNaturalBlackjack(h)));
@@ -526,7 +536,7 @@ export default function App() {
         shoeRef.current.visibleRunningCount += drawnCard.countValue;
         dHand.push(drawnCard);
         setDealerHand([...dHand]);
-        announce(`Dealer draws ${getSpokenCard(drawnCard)}. Dealer has ${getSpokenHandTotal(dHand)}.`);
+        await announce(getDealerCardCall(drawnCard));
       }
     }
     resolveRound(dHand, spots, insBets, presetWinnings, totalWager);
@@ -581,7 +591,7 @@ export default function App() {
       })
     )).join('. ');
     announce(
-      `Dealer finishes with ${dTotal > 21 ? `a bust at ${dTotal}` : dTotal}. ${outcomeSummary}. Round complete. Say next round when ready.`,
+      `${getDealerFinishCall(dHand)} ${outcomeSummary}. Round complete. Say next round when ready.`,
       { listenAfter: true },
     );
   };
@@ -744,6 +754,13 @@ export default function App() {
       announce(getVoicePrompt(), { listenAfter: true });
       return;
     }
+    if (command.type === 'micTest') {
+      announce(
+        `Microphone check passed. I heard ${lastHeard || 'your voice'} clearly.`,
+        { listenAfter: true },
+      );
+      return;
+    }
     if (command.type === 'bankroll') {
       announce(`Bankroll is ${bankroll} dollars. ${getVoicePrompt()}`, { listenAfter: true });
       return;
@@ -859,7 +876,7 @@ export default function App() {
   const renderChipStack = (amount, outcome) => {
     let remaining = amount;
     const chips = [];
-    [500, 100, 25, 5].forEach(d => {
+    [1000, 500, 100, 25, 5].forEach(d => {
       while (remaining >= d) { chips.push(d); remaining -= d; }
     });
 
@@ -870,15 +887,16 @@ export default function App() {
     return (
       <div className={`chip-stack-container ${glowClass}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '8px', padding: '4px', borderRadius: '50px', transition: 'all 0.4s ease' }}>
         {chips.map((c, idx) => (
-          <div key={idx} style={{
+          <div className="chip-token" key={idx} style={{
             width: '36px', height: '36px', borderRadius: '50%', background: getChipColor(c),
             border: '2px dashed #fff', boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '0.7rem', fontWeight: 'bold', color: '#fff',
-            transform: `translateY(-${idx * 6}px)`, zIndex: idx
-          }}>${c}</div>
+            transform: `translateY(-${idx * 13}px)`, zIndex: idx,
+            animationDelay: `${idx * 35}ms`,
+          }}>${c >= 1000 ? `${c / 1000}K` : c}</div>
         ))}
-        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#f1c40f', marginTop: `-${(chips.length - 1) * 6}px` }}>${amount}</div>
+        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#f1c40f', marginTop: `-${Math.max(0, chips.length - 1) * 13}px` }}>${amount}</div>
       </div>
     );
   };
@@ -894,22 +912,28 @@ export default function App() {
       
       <style>{`
         @keyframes chipGreenGlow {
-          0% { transform: scale(1); box-shadow: 0 0 10px #2ecc71; }
-          50% { transform: scale(1.15); box-shadow: 0 0 30px #2ecc71, 0 0 50px #2ecc71; filter: brightness(1.3); }
-          100% { transform: scale(1); box-shadow: 0 0 15px #2ecc71; }
+          0% { transform: translateY(12px) scale(0.92); opacity: 0.35; }
+          52% { transform: translateY(-7px) scale(1.08); box-shadow: 0 0 28px rgba(46, 204, 113, 0.7); }
+          76% { transform: translateY(2px) scale(0.99); }
+          100% { transform: translateY(0) scale(1); box-shadow: 0 0 12px rgba(46, 204, 113, 0.32); opacity: 1; }
         }
         @keyframes chipRedGlow {
-          0% { transform: scale(1); box-shadow: 0 0 10px #e74c3c; }
-          50% { transform: scale(1.05); box-shadow: 0 0 25px #e74c3c; }
-          100% { transform: scale(1); box-shadow: 0 0 15px #e74c3c; }
+          0% { transform: translateX(0) rotate(0); opacity: 1; }
+          35% { transform: translateX(-5px) rotate(-3deg); box-shadow: 0 0 20px rgba(231, 76, 60, 0.55); }
+          100% { transform: translateX(20px) rotate(5deg); opacity: 0.46; }
         }
         @keyframes cardRevealSlow {
           0% { transform: rotateY(90deg) scale(0.9); opacity: 0; }
           100% { transform: rotateY(0deg) scale(1); opacity: 1; }
         }
         .card-reveal { animation: cardRevealSlow 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
-        .chip-glow-green { animation: chipGreenGlow 1.2s ease-in-out infinite; background: rgba(46, 204, 113, 0.2); }
-        .chip-glow-red { animation: chipRedGlow 1.2s ease-in-out infinite; background: rgba(231, 76, 60, 0.2); }
+        .chip-glow-green { animation: chipGreenGlow 760ms cubic-bezier(0.2, 0.85, 0.3, 1) both; background: rgba(46, 204, 113, 0.12); }
+        .chip-glow-red { animation: chipRedGlow 680ms ease-in both; background: rgba(231, 76, 60, 0.12); }
+        .chip-token { animation: chipSettle 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        @keyframes chipSettle {
+          from { margin-top: -18px; opacity: 0; filter: brightness(1.35); }
+          to { margin-top: 0; opacity: 1; filter: brightness(1); }
+        }
       `}</style>
 
       {showCheatSheet && <CheatSheet onClose={() => setShowCheatSheet(false)} />}
@@ -956,33 +980,77 @@ export default function App() {
           <button className="topbar-button" onClick={() => setShowCount(!showCount)}>{showCount ? "Hide Count" : "Peek Count"}</button>
           <button className={`topbar-button ${soundEnabled ? 'is-on' : ''}`} onClick={() => setSoundEnabled(current => !current)}>{soundEnabled ? 'Sound on' : 'Sound off'}</button>
           <button className={`topbar-button ${speechEnabled ? 'is-on' : ''}`} onClick={() => setSpeechEnabled(current => !current)}>{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</button>
-          {availableVoices.length > 0 && (
+          {(kokoroVoices.length > 0 || availableVoices.length > 0) && (
             <label className="voice-picker">
-              <span>Voice</span>
+              <span>
+                {voiceModelStatus === 'loading'
+                  ? `Loading AI voice${voiceModelProgress ? ` ${voiceModelProgress}%` : '…'}`
+                  : voiceModelStatus === 'warming' ? 'AI voice warming up' : 'Voice'}
+              </span>
               <select
                 aria-label="Dealer voice"
                 value={selectedVoiceName}
                 onChange={event => setSelectedVoiceName(event.target.value)}
               >
-                {availableVoices.map(voice => (
-                  <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
-                    {voice.name}
-                  </option>
-                ))}
+                <optgroup label="Kokoro studio voices · downloads on first use">
+                  {kokoroVoices.map(voice => (
+                    <option key={voice.id} value={`kokoro:${voice.id}`}>
+                      {voice.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Fast device voices">
+                  {availableVoices.map(voice => (
+                    <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
+                      {voice.name}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </label>
           )}
           <button
-            className={`topbar-button voice-toggle ${voiceInputEnabled ? 'is-on is-listening' : ''}`}
+            className={`topbar-button voice-toggle ${voiceInputEnabled ? 'is-on' : ''} ${['starting', 'listening', 'hearing', 'processing'].includes(voiceStatus) ? 'is-listening' : ''}`}
             onClick={handleVoiceToggle}
             disabled={!voiceSupported}
             aria-pressed={voiceInputEnabled}
           >
-            {voiceSupported ? (voiceInputEnabled ? 'Hands-free on' : 'Hands-free mode') : 'Voice unavailable'}
+            {voiceSupported
+              ? voiceStatus === 'blocked'
+                ? 'Mic blocked'
+                : voiceStatus === 'hearing'
+                  ? 'Hearing you…'
+                  : voiceStatus === 'processing'
+                    ? 'Processing…'
+                    : ['starting', 'listening'].includes(voiceStatus)
+                      ? 'Listening…'
+                      : voiceInputEnabled ? 'Hands-free on' : 'Hands-free mode'
+              : 'Voice unavailable'}
           </button>
           <button className="topbar-button" onClick={() => loggerRef.current.downloadCSV()}>Export</button>
         </div>
       </div>
+
+      {voiceInputEnabled && (
+        <div className={`voice-diagnostic is-${voiceStatus}`} role="status" aria-live="polite">
+          <span className="voice-level" aria-hidden="true"><i /><i /><i /></span>
+          <strong>
+            {voiceStatus === 'hearing'
+              ? 'Speech detected'
+              : voiceStatus === 'processing'
+                ? 'Matching command'
+                : voiceStatus === 'blocked'
+                  ? 'Microphone blocked'
+                  : voiceStatus === 'error'
+                    ? 'Microphone needs attention'
+                    : 'Microphone listening'}
+          </strong>
+          <span>
+            {voiceError
+              || (lastHeard ? `Latest transcript: “${lastHeard}”` : 'Say “microphone test” to verify the full recognition path.')}
+          </span>
+        </div>
+      )}
 
       {showReload && (
         <section className="reload-panel" aria-label="Reload bankroll">
@@ -1142,6 +1210,7 @@ export default function App() {
           lastHeard={lastHeard}
           onToggleVoiceInput={handleVoiceToggle}
           voiceInputEnabled={voiceInputEnabled}
+          voiceError={voiceError}
           voiceStatus={voiceStatus}
           voiceSupported={voiceSupported}
         />
