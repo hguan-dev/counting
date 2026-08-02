@@ -15,6 +15,7 @@ export default function GameControls({
   canSurrender,
   canResplit,
   hintedAction,
+  onHint,
   onInsurance,
   onNextRound,
 }) {
@@ -118,6 +119,18 @@ export default function GameControls({
               {hintedAction === 'surrender' && <small>Recommended</small>}
             </button>
           )}
+          <button
+            className="action-button is-hint"
+            onClick={onHint}
+            aria-label="Show strategy hint"
+            title="Show strategy hint"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 18h6M10 22h4M8.3 14.7A6 6 0 1 1 15.7 14.7C14.6 15.5 14 16.3 14 18h-4c0-1.7-.6-2.5-1.7-3.3Z" />
+              <path d="M12 2V0M4.9 4.9 3.5 3.5M19.1 4.9l1.4-1.4M2 12H0M24 12h-2" />
+            </svg>
+            <span className="sr-only">Hint</span>
+          </button>
         </div>
       )}
 

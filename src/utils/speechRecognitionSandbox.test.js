@@ -42,8 +42,9 @@ const COMMAND_CASES = [
   ['how sick', { type: 'sickReaction' }],
   ['how sick is that', { type: 'sickReaction' }],
   ['nah', { type: 'proceed' }],
-  ['sorry', { type: 'cancel' }],
-  ['my bad', { type: 'cancel' }],
+  ['sorry', { type: 'correct' }],
+  ['my bad', { type: 'correct' }],
+  ['go back', { type: 'cancel' }],
   ['two spots bet twenty five and fifty', {
     type: 'configureBets',
     spotCount: 2,

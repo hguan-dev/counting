@@ -200,7 +200,8 @@ export const parseVoiceCommand = (transcript) => {
   if (/\bba+n+g+\b|\bgood\s+boy\b/.test(normalized)) return { type: 'celebrate' };
   if (/\b(?:bro|fuck|seriously|sickening|sick)\b|\bare\s+you\s+serious\b/.test(normalized)) return { type: 'sickReaction' };
   if (/\b(?:proceed|do\s+it|play\s+anyway|nah)\b/.test(normalized)) return { type: 'proceed' };
-  if (/\b(?:correct\s+play|go\s+back|cancel|sorry|my\s+bad)\b/.test(normalized)) return { type: 'cancel' };
+  if (/\b(?:correct\s+play|sorry|my\s+bad)\b/.test(normalized)) return { type: 'correct' };
+  if (/\b(?:go\s+back|cancel)\b/.test(normalized)) return { type: 'cancel' };
   if (/\b(?:tip|hint|advice|recommended\s+(?:move|play)|correct\s+move|what\s+should\s+i\s+do|what(?:'s|\s+is)\s+the\s+(?:move|play))\b/.test(normalized)) return { type: 'tip' };
   if (/^(?:count|running\s+count|true\s+count)\s+(?:off|hide)$/.test(normalized)) return { type: 'count', enabled: false };
   if (/\b(?:running\s+count|true\s+count|count)(?:\s+(?:on|show))?\b/.test(normalized)) return { type: 'count', enabled: true };
@@ -238,6 +239,7 @@ export const shouldDispatchInterimCommand = (transcript, command) => {
     'action',
     'cancel',
     'celebrate',
+    'correct',
     'evenMoney',
     'insurance',
     'nextRound',

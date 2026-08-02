@@ -26,7 +26,7 @@ Play the current build at [hguan-dev.github.io/counting](https://hguan-dev.githu
 - A $25-unit bet ramp: $25 through TC +1, $50 at +2, $100 at +3, $150 at +4, and $200
   at +5 or higher.
 - Optional running count, true count, and estimated decks-remaining display.
-- Live realized session P&L, raw mistakes, total graded decisions, and mistake rate.
+- Live realized session P&L and strategy accuracy, calculated from graded decisions.
 - A per-settled-hand cumulative P&L chart with true count on a labeled independent axis.
 
 Asking for a hint or triggering a strategy warning counts as one mistake. A warned
@@ -49,6 +49,7 @@ Useful conversational aliases include:
 - `good`, `I'm good`, `stay`, or `Stan`: stand.
 - `face up` or `face down`: choose the corresponding double treatment.
 - `sorry` or `my bad`: dismiss a strategy warning and use the recommendation.
+- `go back`: close the warning without revealing or highlighting the recommendation.
 - `nah`: keep the warned choice and play anyway.
 - `hint`: highlight and explain the count-adjusted optimal action.
 

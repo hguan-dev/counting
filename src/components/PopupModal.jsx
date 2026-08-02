@@ -5,6 +5,7 @@ export default function PopupModal({
   rule,
   optimalAction,
   revealHint = false,
+  onBack,
   onCorrect,
   onHint,
   onProceed,
@@ -31,8 +32,9 @@ export default function PopupModal({
             : <><strong>Strategy check:</strong> This choice differs from the current basic-strategy or count-index play.</>}
         </div>
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-          {!revealHint && onHint && <button onClick={onHint} style={{ padding: '0.6rem 1.2rem', background: '#2ecc71', color: '#000', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Show hint</button>}
-          {onCorrect && <button onClick={onCorrect} style={{ padding: '0.6rem 1.2rem', background: revealHint ? '#2ecc71' : 'rgba(255,255,255,0.1)', color: revealHint ? '#000' : '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Use recommendation</button>}
+          {!revealHint && onHint && <button onClick={onHint} aria-label="Show strategy hint" style={{ display: 'inline-flex', gap: '0.45rem', alignItems: 'center', padding: '0.6rem 1.2rem', background: '#2ecc71', color: '#000', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}><span aria-hidden="true">💡</span> Hint</button>}
+          {!revealHint && onBack && <button onClick={onBack} style={{ padding: '0.6rem 1.2rem', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Go back</button>}
+          {revealHint && onCorrect && <button onClick={onCorrect} style={{ padding: '0.6rem 1.2rem', background: '#2ecc71', color: '#000', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Use recommendation</button>}
           {onProceed && <button onClick={onProceed} style={{ padding: '0.6rem 1.2rem', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Play Anyway</button>}
         </div>
       </div>

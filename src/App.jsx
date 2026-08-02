@@ -922,9 +922,47 @@ export default function App() {
     if (proceed) {
       executeRequestedAction(action.intended);
     } else {
-      setHintedAction(action.optimal);
       executeRequestedAction(action.optimal);
     }
+  };
+
+  const dismissPendingAction = () => {
+    setPendingAction(null);
+    setHintedAction(null);
+  };
+
+  const requestHint = () => {
+    if (pendingAction?.type === 'play') {
+      setHintedAction(pendingAction.optimal);
+      setPendingAction(current => current ? { ...current, revealHint: true } : current);
+      return;
+    }
+
+    const hand = getCurrentActiveHand();
+    if (gameState !== 'playing' || !hand || !dealerHand[0]) {
+      announce('Strategy advice is available during an active player hand.', { listenAfter: true });
+      return;
+    }
+    const evaluation = getDetailedPlay(
+      hand.cards,
+      dealerHand[0],
+      shoeRef.current.trueCount,
+      {
+        allowSurrender: canSurrenderHand(hand),
+        runningCount: shoeRef.current.visibleRunningCount,
+      },
+    );
+    let recommendedAction = evaluation.action;
+    if (recommendedAction === 'double' && hand.cards.length > 2) {
+      recommendedAction = calculateTotal(hand.cards) >= 18 ? 'stand' : 'hit';
+    }
+    setHintedAction(recommendedAction);
+    setStrategyDecisions(current => current + 1);
+    setStrategyMistakes(current => current + 1);
+    announce(
+      `${evaluation.type} recommends ${recommendedAction}. The recommended button is highlighted. ${evaluation.rule}`,
+      { listenAfter: true },
+    );
   };
 
   const canSplitCurrent = () => {
@@ -1089,31 +1127,7 @@ export default function App() {
       return;
     }
     if (command.type === 'tip') {
-      const hand = getCurrentActiveHand();
-      if (gameState !== 'playing' || !hand || !dealerHand[0]) {
-        announce('Strategy advice is available during an active player hand.', { listenAfter: true });
-        return;
-      }
-      const evaluation = getDetailedPlay(
-        hand.cards,
-        dealerHand[0],
-        shoeRef.current.trueCount,
-        {
-          allowSurrender: canSurrenderHand(hand),
-          runningCount: shoeRef.current.visibleRunningCount,
-        },
-      );
-      let recommendedAction = evaluation.action;
-      if (recommendedAction === 'double' && hand.cards.length > 2) {
-        recommendedAction = calculateTotal(hand.cards) >= 18 ? 'stand' : 'hit';
-      }
-      setHintedAction(recommendedAction);
-      setStrategyDecisions(current => current + 1);
-      setStrategyMistakes(current => current + 1);
-      announce(
-        `${evaluation.type} recommends ${recommendedAction}. The recommended button is highlighted. ${evaluation.rule}`,
-        { listenAfter: true },
-      );
+      requestHint();
       return;
     }
     if (command.type === 'count') {
@@ -1197,7 +1211,8 @@ export default function App() {
 
     if (pendingAction) {
       if (command.type === 'proceed') resolvePendingAction(true);
-      else if (command.type === 'cancel') resolvePendingAction(false);
+      else if (command.type === 'correct') resolvePendingAction(false);
+      else if (command.type === 'cancel') dismissPendingAction();
       else announce(getVoiceSummary(), { listenAfter: true });
       return;
     }
@@ -1336,8 +1351,8 @@ export default function App() {
     );
   };
 
-  const mistakeRate = strategyDecisions > 0
-    ? Math.round((strategyMistakes / strategyDecisions) * 100)
+  const accuracyRate = strategyDecisions > 0
+    ? Math.round(((strategyDecisions - strategyMistakes) / strategyDecisions) * 100)
     : 0;
 
   return (
@@ -1444,11 +1459,9 @@ export default function App() {
         optimalAction={pendingAction?.optimal}
         rule={pendingAction?.rule}
         revealHint={pendingAction?.revealHint}
+        onBack={dismissPendingAction}
         onCorrect={() => resolvePendingAction(false)}
-        onHint={() => {
-          setHintedAction(pendingAction?.optimal);
-          setPendingAction(current => current ? { ...current, revealHint: true } : current);
-        }}
+        onHint={requestHint}
         onProceed={() => resolvePendingAction(true)}
       />
 
@@ -1479,10 +1492,9 @@ export default function App() {
           <span>Bankroll</span>
           <strong>${bankroll.toFixed(2)}</strong>
           <small>+ Reload</small>
-          <span className="session-metrics" aria-label={`Session realized P and L ${sessionPnl} dollars. ${strategyMistakes} mistakes across ${strategyDecisions} decisions, ${mistakeRate} percent.`}>
+          <span className="session-metrics" aria-label={`Session realized P and L ${sessionPnl} dollars. Strategy accuracy ${accuracyRate} percent.`}>
             <span><em>P&amp;L</em><b className={sessionPnl >= 0 ? 'is-positive' : 'is-negative'}>{sessionPnl >= 0 ? '+' : '−'}${Math.abs(sessionPnl).toFixed(2)}</b></span>
-            <span><em>Mistakes</em><b>{strategyMistakes} / {strategyDecisions}</b></span>
-            <span><em>Rate</em><b>{mistakeRate}%</b></span>
+            <span><em>Accuracy</em><b>{accuracyRate}%</b></span>
           </span>
         </button>
         <div className="header-actions">
@@ -1831,6 +1843,7 @@ export default function App() {
           canSurrender={canSurrenderHand(getCurrentActiveHand())}
           canResplit={(playerSpots[activeSpotIndex]?.subHands.length || 0) > 1}
           hintedAction={hintedAction}
+          onHint={requestHint}
           onInsurance={executeInsurance}
           onNextRound={beginNextRound}
         />

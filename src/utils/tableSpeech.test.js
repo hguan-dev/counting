@@ -109,8 +109,9 @@ describe('table speech', () => {
     expect(parseVoiceCommand('how sick')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('how sick is that')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('nah')).toEqual({ type: 'proceed' });
-    expect(parseVoiceCommand('sorry')).toEqual({ type: 'cancel' });
-    expect(parseVoiceCommand('my bad')).toEqual({ type: 'cancel' });
+    expect(parseVoiceCommand('sorry')).toEqual({ type: 'correct' });
+    expect(parseVoiceCommand('my bad')).toEqual({ type: 'correct' });
+    expect(parseVoiceCommand('go back')).toEqual({ type: 'cancel' });
     expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count', enabled: true });
     expect(parseVoiceCommand('count off')).toEqual({ type: 'count', enabled: false });
     expect(parseVoiceCommand('dealer give me a tip')).toEqual({ type: 'tip' });
@@ -165,6 +166,7 @@ describe('table speech', () => {
     expect(shouldDispatchInterimCommand('run it', parseVoiceCommand('run it'))).toBe(true);
     expect(shouldDispatchInterimCommand('reddit', parseVoiceCommand('reddit'))).toBe(true);
     expect(shouldDispatchInterimCommand('sorry', parseVoiceCommand('sorry'))).toBe(true);
+    expect(shouldDispatchInterimCommand('go back', parseVoiceCommand('go back'))).toBe(true);
     expect(shouldDispatchInterimCommand('nah', parseVoiceCommand('nah'))).toBe(true);
     expect(shouldDispatchInterimCommand('face down', parseVoiceCommand('face down'))).toBe(true);
     expect(shouldDispatchInterimCommand('count off', parseVoiceCommand('count off'))).toBe(true);
