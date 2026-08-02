@@ -34,6 +34,37 @@ describe('split hand rules', () => {
     ))).toBe(false);
   });
 
+  test('recognizes valid resplits after cards have been serialized', () => {
+    const serializedEights = playingHand(
+      [{ suit: '♥', value: '8' }, { suit: '♠', value: '8' }],
+      { isSplitHand: true },
+    );
+    const serializedEightTen = playingHand(
+      [{ suit: '♥', value: '8' }, { suit: '♠', value: '10' }],
+      { isSplitHand: true },
+    );
+
+    expect(canSplitHand(serializedEights)).toBe(true);
+    expect(canSplitHand(serializedEightTen)).toBe(false);
+  });
+
+  test('resplits a newly dealt pair of eights into two more hands', () => {
+    const original = playingHand([new Card('♥', '8'), new Card('♠', '8')]);
+    const firstDraws = [new Card('♦', '10'), new Card('♣', '8')];
+    const firstSplit = splitHand(original, () => firstDraws.shift());
+    expect(firstSplit.map(hand => hand.cards.map(card => card.value))).toEqual([
+      ['8', '10'],
+      ['8', '8'],
+    ]);
+
+    const resplitDraws = [new Card('♦', '3'), new Card('♣', '9')];
+    const resplit = splitHand(firstSplit[1], () => resplitDraws.shift());
+    expect(resplit.map(hand => hand.cards.map(card => card.value))).toEqual([
+      ['8', '3'],
+      ['8', '9'],
+    ]);
+  });
+
   test('creates two playable hands while preserving the wager', () => {
     const hand = playingHand([new Card('♥', '8'), new Card('♠', '8')]);
     const draws = [new Card('♦', '3'), new Card('♣', '10')];

@@ -11,8 +11,14 @@ export default function GameControls({
   onSplit,
   canDouble,
   canSplit,
+  canResplit,
   onInsurance,
-  onNextRound
+  onNextRound,
+  lastHeard,
+  onToggleVoiceInput,
+  voiceInputEnabled,
+  voiceStatus,
+  voiceSupported,
 }) {
   return (
     <div className="game-controls" aria-label="Game controls">
@@ -56,7 +62,25 @@ export default function GameControls({
           <button className="action-button is-hit" onClick={onHit}><span>Hit</span><small>Take a card</small></button>
           <button className="action-button is-stand" onClick={onStand}><span>Stand</span><small>Hold total</small></button>
           {canDouble && <button className="action-button is-double" onClick={onDouble}><span>Double</span><small>One card</small></button>}
-          {canSplit && <button className="action-button is-split" onClick={onSplit}><span>Split</span><small>Two hands</small></button>}
+          {canSplit && <button className="action-button is-split" onClick={onSplit}><span>{canResplit ? 'Resplit' : 'Split'}</span><small>Up to 4 hands</small></button>}
+          <button
+            className={`voice-action ${voiceInputEnabled ? 'is-on' : ''} ${voiceStatus === 'listening' ? 'is-listening' : ''}`}
+            onClick={onToggleVoiceInput}
+            disabled={!voiceSupported}
+            aria-pressed={voiceInputEnabled}
+          >
+            <span className="mic-icon" aria-hidden="true">●</span>
+            <span>
+              {voiceSupported
+                ? voiceStatus === 'blocked'
+                  ? 'Microphone blocked'
+                  : voiceStatus === 'listening'
+                    ? 'Listening…'
+                    : voiceInputEnabled ? 'Voice commands on' : 'Enable voice commands'
+                : 'Voice commands unavailable'}
+              <small>{lastHeard ? `Heard: “${lastHeard}”` : 'Say “hit” or “stand”'}</small>
+            </span>
+          </button>
         </div>
       )}
 

@@ -164,6 +164,7 @@ export default function CheatSheet({ onClose }) {
                 <li>Dealer hits soft 17 (H17).</li>
                 <li>Blackjack pays 3:2.</li>
                 <li>Double after split is allowed.</li>
+                <li>Pairs may be resplit to a maximum of four hands.</li>
                 <li>Split Aces receive one card each.</li>
               </ul>
             </details>

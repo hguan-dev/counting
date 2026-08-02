@@ -1,5 +1,12 @@
 import { calculateTotal } from './strategyEngine';
 
+const getNumericValue = (card) => {
+  if (card.numericValue !== undefined) return card.numericValue;
+  if (['J', 'Q', 'K'].includes(card.value)) return 10;
+  if (card.value === 'A') return 11;
+  return Number(card.value);
+};
+
 export const isNaturalBlackjack = (hand) => (
   Boolean(hand)
   && !hand.isSplitHand
@@ -46,7 +53,7 @@ export const canSplitHand = (hand) => (
   Boolean(hand)
   && hand.status === 'playing'
   && hand.cards.length === 2
-  && hand.cards[0].numericValue === hand.cards[1].numericValue
+  && getNumericValue(hand.cards[0]) === getNumericValue(hand.cards[1])
 );
 
 export const splitHand = (hand, drawCard) => {

@@ -15,6 +15,8 @@ import CheatSheet from './components/CheatSheet';
 import PopupModal from './components/PopupModal';
 import GameControls from './components/GameControls';
 import PlayingCard from './components/PlayingCard';
+import useTableVoice from './hooks/useTableVoice';
+import { getSpokenCard, getSpokenHandTotal } from './utils/tableSpeech';
 
 const getChipColor = (denom) => {
   if (denom >= 500) return '#a29bfe';
@@ -38,10 +40,13 @@ const isSoft17 = (cards) => {
 export default function App() {
   const shoeRef = useRef(new Shoe(6));
   const loggerRef = useRef(new GameLogger());
+  const handleActionRef = useRef(null);
   
   const [bankroll, setBankroll] = useState(1000);
   const [initialBet, setInitialBet] = useState(25);
   const [numHands, setNumHands] = useState(1);
+  const [showReload, setShowReload] = useState(false);
+  const [reloadAmount, setReloadAmount] = useState(500);
   
   const [gameState, setGameState] = useState('betting'); 
   const [playerSpots, setPlayerSpots] = useState([]); 
@@ -57,6 +62,49 @@ export default function App() {
   const [showStrategyPopups, setShowStrategyPopups] = useState(true);
   const [pendingAction, setPendingAction] = useState(null);
 
+  const {
+    announce,
+    lastHeard,
+    playSound,
+    setSoundEnabled,
+    setSpeechEnabled,
+    soundEnabled,
+    speechEnabled,
+    toggleVoiceInput,
+    voiceInputEnabled,
+    voiceStatus,
+    voiceSupported,
+  } = useTableVoice({
+    isPlaying: gameState === 'playing' && !pendingAction,
+    onCommand: action => handleActionRef.current?.(action),
+  });
+
+  const announcePlayerTurn = (spots, spotIndex, handIndex, lead = '') => {
+    const spot = spots[spotIndex];
+    const hand = spot?.subHands[handIndex];
+    if (!hand) return;
+    const handName = spot.subHands.length > 1
+      ? `Split hand ${handIndex + 1}`
+      : `Player spot ${spotIndex + 1}`;
+    const prefix = lead ? `${lead} ` : '';
+    announce(
+      `${prefix}${handName} has ${getSpokenHandTotal(hand.cards)}. Hit or stand?`,
+      { listenAfter: true },
+    );
+  };
+
+  const addToBankroll = () => {
+    const amount = Number(reloadAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const safeAmount = Math.min(amount, 100000);
+    setBankroll(current => current + safeAmount);
+    setReloadAmount(safeAmount);
+    setShowReload(false);
+    playSound('chips');
+    announce(`${safeAmount} dollars added. Bankroll is reloaded.`);
+    loggerRef.current.log('RELOAD', `Added $${safeAmount} to bankroll.`);
+  };
+
   const deal = async () => {
     const totalWager = initialBet * numHands;
     if (bankroll < totalWager) return alert("Insufficient funds!");
@@ -69,6 +117,7 @@ export default function App() {
     }
 
     setBankroll(b => b - totalWager);
+    playSound('deal');
     loggerRef.current.log('DEAL', `Wagered $${initialBet} across ${numHands} spot(s). Total: $${totalWager}`);
     setInsuranceBets(new Array(numHands).fill(0));
     setEvenMoneyQueue([]);
@@ -109,9 +158,11 @@ export default function App() {
       if (evenMoneyOffers.length > 0) {
         setEvenMoneyQueue(evenMoneyOffers);
         setGameState('evenMoney');
+        announce(`Dealer shows an ace. Spot ${evenMoneyOffers[0].spotIndex + 1} has blackjack. Even money?`);
         return;
       }
       setGameState('insurance');
+      announce('Dealer shows an ace. Insurance is open.');
       return;
     }
 
@@ -135,6 +186,8 @@ export default function App() {
 
       setBankroll(b => b + netReturn);
       setGameState('resolved');
+      playSound(netReturn > 0 ? 'chips' : 'loss');
+      announce(`Dealer has blackjack. Round complete.`);
       return;
     }
 
@@ -159,12 +212,21 @@ export default function App() {
     if (allResolved) {
       setBankroll(b => b + payoutReturn);
       setGameState('resolved');
+      playSound('win');
+      announce(`Dealer has a ${getSpokenCard(d1)} upcard. Player blackjack.`);
     } else {
-      findFirstActiveHand(spots, 0, 0, payoutReturn, totalWager);
+      findFirstActiveHand(
+        spots,
+        0,
+        0,
+        payoutReturn,
+        totalWager,
+        `Dealer has a ${getSpokenCard(d1)} upcard.`,
+      );
     }
   };
 
-  const findFirstActiveHand = (spots, sIdx, hIdx, runningReturn, totalWager) => {
+  const findFirstActiveHand = (spots, sIdx, hIdx, runningReturn, totalWager, lead = '') => {
     let found = false;
     for (let s = sIdx; s < spots.length; s++) {
       for (let h = (s === sIdx ? hIdx : 0); h < spots[s].subHands.length; h++) {
@@ -173,6 +235,7 @@ export default function App() {
           setActiveSubHandIndex(h);
           setGameState('playing');
           if (runningReturn > 0) setBankroll(b => b + runningReturn);
+          announcePlayerTurn(spots, s, h, lead);
           found = true;
           return;
         }
@@ -246,6 +309,8 @@ export default function App() {
       setPlayerSpots(spots);
       setBankroll(b => b + netReturn);
       setGameState('resolved');
+      playSound(netReturn > 0 ? 'chips' : 'loss');
+      announce(`Dealer has blackjack. Round complete.`);
     } else {
       const spots = JSON.parse(JSON.stringify(spotsOverride));
       let winnings = 0;
@@ -266,6 +331,12 @@ export default function App() {
         setActiveSpotIndex(next.spotIndex);
         setActiveSubHandIndex(next.handIndex);
         setGameState('playing');
+        announcePlayerTurn(
+          spots,
+          next.spotIndex,
+          next.handIndex,
+          'Dealer does not have blackjack.',
+        );
       } else {
         playDealerAndResolve(dealerHand, spots, nextInsuranceBets, winnings, totalWager);
       }
@@ -278,6 +349,7 @@ export default function App() {
     let spots = JSON.parse(JSON.stringify(playerSpots));
     let hand = spots[activeSpotIndex].subHands[activeSubHandIndex];
     const drawnCard = shoeRef.current.draw();
+    playSound('card');
     shoeRef.current.visibleRunningCount += drawnCard.countValue;
     hand.cards.push(drawnCard);
     const total = calculateTotal(hand.cards);
@@ -285,19 +357,25 @@ export default function App() {
     if (total > 21) {
       hand.status = 'bust';
       hand.outcome = 'loss';
-      advancePointer(spots);
+      advancePointer(spots, false, `Player draws ${getSpokenCard(drawnCard)} and busts with ${total}.`);
     } else if (total === 21 || hand.isSplitAce) {
       hand.status = 'stood';
-      advancePointer(spots);
+      advancePointer(spots, false, `Player draws ${getSpokenCard(drawnCard)} and has ${total}.`);
     } else {
       setPlayerSpots(spots);
+      announce(
+        `Player draws ${getSpokenCard(drawnCard)}. Total ${getSpokenHandTotal(hand.cards)}. Hit or stand?`,
+        { listenAfter: true },
+      );
     }
   };
 
   const executeStand = () => {
     let spots = JSON.parse(JSON.stringify(playerSpots));
-    spots[activeSpotIndex].subHands[activeSubHandIndex].status = 'stood';
-    advancePointer(spots);
+    const hand = spots[activeSpotIndex].subHands[activeSubHandIndex];
+    hand.status = 'stood';
+    playSound('stand');
+    advancePointer(spots, false, `Player stands on ${getSpokenHandTotal(hand.cards)}.`);
   };
 
   const executeDouble = () => {
@@ -309,6 +387,7 @@ export default function App() {
     hand.isDoubled = true;
     hand.bet *= 2;
     const drawnCard = shoeRef.current.draw();
+    playSound('card');
     shoeRef.current.visibleRunningCount += drawnCard.countValue;
     hand.cards.push(drawnCard);
     const total = calculateTotal(hand.cards);
@@ -319,13 +398,18 @@ export default function App() {
     } else {
       hand.status = 'stood';
     }
-    advancePointer(spots);
+    advancePointer(
+      spots,
+      false,
+      `Player doubles and draws ${getSpokenCard(drawnCard)} for ${total}.`,
+    );
   };
 
   const executeSplit = () => {
     let spots = JSON.parse(JSON.stringify(playerSpots));
     let spot = spots[activeSpotIndex];
     let hand = spot.subHands[activeSubHandIndex];
+    if (spot.subHands.length >= 4 || !canSplitHand(hand)) return;
     if (bankroll < hand.bet) return alert("Insufficient funds to split!");
 
     setBankroll(b => b - hand.bet);
@@ -336,14 +420,19 @@ export default function App() {
       return card;
     });
     shoeRef.current.visibleRunningCount += drawnCards.reduce((sum, card) => sum + card.countValue, 0);
+    playSound('deal');
 
     spot.subHands.splice(activeSubHandIndex, 1, ...splitHands);
     setPlayerSpots(spots);
 
-    advancePointer(spots, true);
+    advancePointer(
+      spots,
+      true,
+      `Cards split. First hand draws ${getSpokenCard(drawnCards[0])}. Second hand draws ${getSpokenCard(drawnCards[1])}.`,
+    );
   };
 
-  const advancePointer = (spots, includeCurrent = false) => {
+  const advancePointer = (spots, includeCurrent = false, lead = '') => {
     setPlayerSpots(spots);
     const next = findNextPlayableHand(
       spots,
@@ -356,6 +445,7 @@ export default function App() {
       setActiveSpotIndex(next.spotIndex);
       setActiveSubHandIndex(next.handIndex);
       setGameState('playing');
+      announcePlayerTurn(spots, next.spotIndex, next.handIndex, lead);
       return;
     }
 
@@ -369,6 +459,7 @@ export default function App() {
 
     let dHand = [...dInitialHand];
     await new Promise(r => setTimeout(r, 1000));
+    announce(`Dealer reveals ${getSpokenCard(dHand[1])}. Dealer has ${getSpokenHandTotal(dHand)}.`);
 
     const dealerHasBlackjack = calculateTotal(dHand) === 21 && dHand.length === 2;
     const needsDealerDraw = spots.some(spot => spot.subHands.some(h => h.status === 'stood' && !isNaturalBlackjack(h)));
@@ -377,9 +468,11 @@ export default function App() {
       while (calculateTotal(dHand) < 17 || isSoft17(dHand)) {
         await new Promise(r => setTimeout(r, 900)); 
         const drawnCard = shoeRef.current.draw();
+        playSound('card');
         shoeRef.current.visibleRunningCount += drawnCard.countValue;
         dHand.push(drawnCard);
         setDealerHand([...dHand]);
+        announce(`Dealer draws ${getSpokenCard(drawnCard)}. Dealer has ${getSpokenHandTotal(dHand)}.`);
       }
     }
     resolveRound(dHand, spots, insBets, presetWinnings, totalWager);
@@ -423,6 +516,9 @@ export default function App() {
 
     setBankroll(b => b + totalReturn);
     setGameState('resolved');
+    const outcomes = spots.flatMap(spot => spot.subHands.map(hand => hand.outcome));
+    playSound(outcomes.includes('win') ? 'win' : outcomes.every(outcome => outcome === 'loss') ? 'loss' : 'chips');
+    announce(`Dealer finishes with ${dTotal > 21 ? `a bust at ${dTotal}` : dTotal}. Round complete.`);
   };
 
   const handleAction = (actionType) => {
@@ -455,6 +551,8 @@ export default function App() {
     }
   };
 
+  handleActionRef.current = handleAction;
+
   const resolvePendingAction = (proceed) => {
     const action = pendingAction;
     setPendingAction(null);
@@ -467,7 +565,8 @@ export default function App() {
   };
 
   const canSplitCurrent = () => {
-    return canSplitHand(getCurrentActiveHand());
+    const currentSpot = playerSpots[activeSpotIndex];
+    return currentSpot?.subHands.length < 4 && canSplitHand(getCurrentActiveHand());
   };
 
   const renderChipStack = (amount, outcome) => {
@@ -547,10 +646,16 @@ export default function App() {
             <span className="table-rules">6 Decks · H17 · Blackjack 3:2</span>
           </div>
         </div>
-        <div className="bankroll-card" aria-label={`Bankroll $${bankroll.toFixed(2)}`}>
+        <button
+          className="bankroll-card"
+          aria-expanded={showReload}
+          aria-label={`Bankroll $${bankroll.toFixed(2)}. Reload bankroll`}
+          onClick={() => setShowReload(current => !current)}
+        >
           <span>Bankroll</span>
           <strong>${bankroll.toFixed(2)}</strong>
-        </div>
+          <small>+ Reload</small>
+        </button>
         <div className="header-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <label className="toggle-label">
             <input type="checkbox" checked={warnStrategy} onChange={() => setWarnStrategy(!warnStrategy)} style={{ accentColor: '#2ecc71' }} /> Guard
@@ -560,9 +665,41 @@ export default function App() {
           </label>
           <button className="topbar-button is-featured" onClick={() => setShowCheatSheet(true)}>Study Guide</button>
           <button className="topbar-button" onClick={() => setShowCount(!showCount)}>{showCount ? "Hide Count" : "Peek Count"}</button>
+          <button className={`topbar-button ${soundEnabled ? 'is-on' : ''}`} onClick={() => setSoundEnabled(current => !current)}>{soundEnabled ? 'Sound on' : 'Sound off'}</button>
+          <button className={`topbar-button ${speechEnabled ? 'is-on' : ''}`} onClick={() => setSpeechEnabled(current => !current)}>{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</button>
           <button className="topbar-button" onClick={() => loggerRef.current.downloadCSV()}>Export</button>
         </div>
       </div>
+
+      {showReload && (
+        <section className="reload-panel" aria-label="Reload bankroll">
+          <div className="reload-copy">
+            <span className="eyebrow">Buy in</span>
+            <strong>Add practice funds</strong>
+          </div>
+          <div className="reload-presets" aria-label="Reload presets">
+            {[100, 500, 1000].map(amount => (
+              <button key={amount} className={reloadAmount === amount ? 'is-selected' : ''} onClick={() => setReloadAmount(amount)}>
+                +${amount}
+              </button>
+            ))}
+          </div>
+          <label className="reload-custom" htmlFor="reload-amount">
+            <span>Custom</span>
+            <input
+              id="reload-amount"
+              aria-label="Custom reload amount"
+              type="number"
+              min="1"
+              max="100000"
+              step="100"
+              value={reloadAmount}
+              onChange={event => setReloadAmount(Number(event.target.value))}
+            />
+          </label>
+          <button className="reload-confirm" onClick={addToBankroll}>Add funds</button>
+        </section>
+      )}
 
       {showCount && (
         <div className="count-panel" aria-live="polite">
@@ -686,8 +823,14 @@ export default function App() {
           onSplit={() => handleAction('split')}
           canDouble={getCurrentActiveHand()?.cards.length === 2}
           canSplit={canSplitCurrent()}
+          canResplit={(playerSpots[activeSpotIndex]?.subHands.length || 0) > 1}
           onInsurance={executeInsurance}
           onNextRound={() => setGameState('betting')}
+          lastHeard={lastHeard}
+          onToggleVoiceInput={toggleVoiceInput}
+          voiceInputEnabled={voiceInputEnabled}
+          voiceStatus={voiceStatus}
+          voiceSupported={voiceSupported}
         />
       )}
     </main>

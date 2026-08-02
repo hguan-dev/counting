@@ -14,10 +14,17 @@ export const calculateTotal = (cards) => {
   return sum;
 };
 
+const getNumericValue = (card) => (
+  card.numericValue !== undefined
+    ? card.numericValue
+    : (['J', 'Q', 'K'].includes(card.value) ? 10 : card.value === 'A' ? 11 : Number(card.value))
+);
+
 export const getDetailedPlay = (pCards, dUpCard, tc) => {
-  const d = dUpCard.numericValue === 11 ? 11 : dUpCard.numericValue;
+  const dValue = getNumericValue(dUpCard);
+  const d = dValue === 11 ? 11 : dValue;
   const p = calculateTotal(pCards);
-  const isPair = pCards.length === 2 && pCards[0].numericValue === pCards[1].numericValue;
+  const isPair = pCards.length === 2 && getNumericValue(pCards[0]) === getNumericValue(pCards[1]);
   const isSoft = pCards.length === 2 && pCards.some(c => c.value === 'A') && p <= 21;
 
   // Illustrious 18 Deviations
@@ -28,7 +35,7 @@ export const getDetailedPlay = (pCards, dUpCard, tc) => {
 
   // Pairs Strategy
   if (isPair) {
-    const v = pCards[0].numericValue;
+    const v = getNumericValue(pCards[0]);
     if (v === 11 || v === 8) return { action: 'split', type: 'Basic Strategy', rule: 'Always split Aces and 8s.' };
     if (v === 10) return { action: 'stand', type: 'Basic Strategy', rule: 'Never split 20.' };
     if (v === 9) return { action: (d === 7 || d === 10 || d === 11) ? 'stand' : 'split', type: 'Basic Strategy', rule: 'Split 9s except vs 7, 10, Ace.' };
