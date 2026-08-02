@@ -1673,19 +1673,6 @@ button:disabled {
   border-radius: 999px;
 }
 
-.confetti-burst i:nth-child(5n) {
-  top: 0;
-  left: -4% !important;
-  animation-name: confettiCannonLeft;
-}
-
-.confetti-burst i:nth-child(7n) {
-  top: 0;
-  right: -4%;
-  left: auto !important;
-  animation-name: confettiCannonRight;
-}
-
 .sick-reaction {
   position: fixed;
   inset: 0;

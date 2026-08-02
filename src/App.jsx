@@ -52,7 +52,6 @@ const CONFETTI_PARTICLES = Array.from({ length: 720 }, (_, index) => ({
   drift: `${((index * 47) % 560) - 280}px`,
   left: `${1 + ((index * 37) % 98)}%`,
   rotation: `${360 + ((index * 83) % 1080)}deg`,
-  reverseRotation: `${-360 - ((index * 83) % 1080)}deg`,
   scale: 0.7 + (index % 7) * 0.1,
 }));
 
@@ -1277,18 +1276,6 @@ export default function App() {
           72% { opacity: 1; }
           100% { opacity: 0; transform: translate3d(var(--confetti-drift), 112vh, 0) rotate(var(--confetti-rotation)) scale(var(--particle-scale)); }
         }
-        @keyframes confettiCannonLeft {
-          0% { opacity: 0; transform: translate3d(-10vw, 26vh, 0) rotate(0deg) scale(0.45); }
-          7% { opacity: 1; }
-          70% { opacity: 1; }
-          100% { opacity: 0; transform: translate3d(112vw, var(--confetti-drift), 0) rotate(var(--confetti-rotation)) scale(var(--particle-scale)); }
-        }
-        @keyframes confettiCannonRight {
-          0% { opacity: 0; transform: translate3d(10vw, 34vh, 0) rotate(0deg) scale(0.45); }
-          7% { opacity: 1; }
-          70% { opacity: 1; }
-          100% { opacity: 0; transform: translate3d(-112vw, var(--confetti-drift), 0) rotate(var(--confetti-reverse-rotation)) scale(var(--particle-scale)); }
-        }
         @keyframes sickReactionFall {
           0% { opacity: 0; transform: translate3d(0, -18vh, 0) rotate(-20deg) scale(0.45); }
           8% { opacity: 1; }
@@ -1316,7 +1303,6 @@ export default function App() {
               key={index}
               style={{
                 '--confetti-drift': particle.drift,
-                '--confetti-reverse-rotation': particle.reverseRotation,
                 '--confetti-rotation': particle.rotation,
                 '--particle-scale': particle.scale,
                 animationDelay: particle.delay,

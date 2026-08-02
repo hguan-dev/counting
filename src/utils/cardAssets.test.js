@@ -10,7 +10,7 @@ describe('card assets', () => {
     [new Card('♣', 'K'), 'king_of_clubs'],
   ])('maps %o to its SVG asset name', (card, expected) => {
     expect(getCardAssetName(card)).toBe(expected);
-    expect(getCardAssetUrl(card)).toBe(`/cards/${expected}.svg`);
+    expect(getCardAssetUrl(card)).toBe(`${import.meta.env.BASE_URL}cards/${expected}.svg`);
   });
 
   test('returns null for malformed cards', () => {

@@ -1,4 +1,4 @@
-const CARD_ASSET_BASE = '/cards';
+const CARD_ASSET_BASE = `${import.meta.env.BASE_URL}cards`;
 
 const RANK_NAMES = {
   A: 'ace',
