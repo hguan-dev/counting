@@ -26,6 +26,11 @@ import {
 } from './utils/tableSpeech';
 import { getKeyboardCommand } from './utils/keyboardShortcuts';
 import { getRecommendedWager, isValidTableWager } from './utils/betSizing';
+import {
+  calculateRealizedPnl,
+  getUnresolvedHandWager,
+  STARTING_BANKROLL,
+} from './utils/sessionAccounting';
 
 const getChipColor = (denom) => {
   if (denom >= 1000) return '#f97316';
@@ -73,7 +78,8 @@ export default function App() {
   const keyboardActionRef = useRef(null);
   const voiceCommandRef = useRef(null);
   
-  const [bankroll, setBankroll] = useState(1000);
+  const [bankroll, setBankroll] = useState(STARTING_BANKROLL);
+  const [totalBuyIns, setTotalBuyIns] = useState(0);
   const [spotBets, setSpotBets] = useState([25, 25]);
   const [numHands, setNumHands] = useState(1);
   const [showReload, setShowReload] = useState(false);
@@ -86,7 +92,6 @@ export default function App() {
   const [dealerHand, setDealerHand] = useState([]);
   const [showCount, setShowCount] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
-  const [sessionPnl, setSessionPnl] = useState(0);
   const [sessionHands, setSessionHands] = useState([]);
   const [strategyDecisions, setStrategyDecisions] = useState(0);
   const [strategyMistakes, setStrategyMistakes] = useState(0);
@@ -147,6 +152,7 @@ export default function App() {
     if (!Number.isFinite(amount) || amount <= 0) return;
     const safeAmount = Math.min(amount, 100000);
     setBankroll(current => current + safeAmount);
+    setTotalBuyIns(current => current + safeAmount);
     setReloadAmount(safeAmount);
     setShowReload(false);
     playSound('chips');
@@ -172,7 +178,6 @@ export default function App() {
   const logRoundResults = (finalDealerHand, spots, finalInsuranceBets = []) => {
     const dealerTotal = calculateTotal(finalDealerHand);
     const dealerBlackjack = dealerTotal === 21 && finalDealerHand.length === 2;
-    let realizedDelta = 0;
     const settledHands = [];
     const closingTrueCount = shoeRef.current.trueCount;
     spots.forEach((spot, spotIndex) => {
@@ -190,7 +195,6 @@ export default function App() {
           : 0;
         const insuranceReturn = insuranceBet > 0 && dealerBlackjack ? insuranceBet * 3 : 0;
         const handNet = returnAmount - hand.bet + insuranceReturn - insuranceBet;
-        realizedDelta += handNet;
         settledHands.push({ net: handNet, trueCount: closingTrueCount });
         loggerRef.current.log(
           'ROUND_RESULT',
@@ -231,7 +235,6 @@ export default function App() {
         );
       }
     });
-    setSessionPnl(current => current + realizedDelta);
     setSessionHands(current => {
       let cumulativePnl = current.at(-1)?.cumulativePnl || 0;
       const nextHands = settledHands.map((hand, index) => {
@@ -1354,6 +1357,22 @@ export default function App() {
   const accuracyRate = strategyDecisions > 0
     ? Math.round(((strategyDecisions - strategyMistakes) / strategyDecisions) * 100)
     : 0;
+  const hasOpenRound = ['playing', 'insurance', 'evenMoney', 'dealerRevealing'].includes(gameState);
+  const unresolvedHandWager = hasOpenRound ? getUnresolvedHandWager(playerSpots) : 0;
+  const insuranceStillAtRisk = gameState === 'insurance'
+    || (
+      gameState === 'dealerRevealing'
+      && dealerHand.length === 2
+      && calculateTotal(dealerHand) === 21
+    );
+  const unresolvedInsuranceWager = insuranceStillAtRisk
+    ? insuranceBets.reduce((sum, bet) => sum + bet, 0)
+    : 0;
+  const sessionPnl = calculateRealizedPnl({
+    bankroll,
+    buyIns: totalBuyIns,
+    unresolvedWager: unresolvedHandWager + unresolvedInsuranceWager,
+  });
 
   return (
     <main className="app-shell" style={{

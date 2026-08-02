@@ -26,7 +26,8 @@ Play the current build at [hguan-dev.github.io/counting](https://hguan-dev.githu
 - A $25-unit bet ramp: $25 through TC +1, $50 at +2, $100 at +3, $150 at +4, and $200
   at +5 or higher.
 - Optional running count, true count, and estimated decks-remaining display.
-- Live realized session P&L and strategy accuracy, calculated from graded decisions.
+- Live realized session P&L reconciled to stack minus starting bankroll and reloads,
+  with unresolved wagers excluded, plus strategy accuracy from graded decisions.
 - A per-settled-hand cumulative P&L chart with true count on a labeled independent axis.
 
 Asking for a hint or triggering a strategy warning counts as one mistake. A warned
@@ -85,7 +86,8 @@ image server, and the UI still includes a built-in text-card fallback.
 
 ## Voice model
 
-Dealer speech uses Kokoro in the browser with the Heart voice selected by default.
+Dealer speech is off by default. When enabled, it uses Kokoro in the browser with the
+Heart voice selected by default.
 Common table phrases are warmed during initialization to reduce first-use latency.
 Model files are cached by the browser after their first successful load.
 

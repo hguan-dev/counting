@@ -26,7 +26,7 @@ const SOUND_PATTERNS = {
 
 export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [speechEnabled, setSpeechEnabled] = useState(true);
+  const [speechEnabled, setSpeechEnabled] = useState(false);
   const [voiceInputEnabled, setVoiceInputEnabled] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('off');
   const [voiceError, setVoiceError] = useState('');
