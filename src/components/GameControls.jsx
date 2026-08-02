@@ -12,6 +12,7 @@ export default function GameControls({
   canDouble,
   canSplit,
   canResplit,
+  hintedAction,
   onInsurance,
   onNextRound,
   lastHeard,
@@ -71,10 +72,38 @@ export default function GameControls({
 
       {gameState === 'playing' && (
         <div className="action-cluster">
-          <button className="action-button is-hit" onClick={onHit}><span>Hit</span></button>
-          <button className="action-button is-stand" onClick={onStand}><span>Stand</span></button>
-          {canDouble && <button className="action-button is-double" onClick={onDouble}><span>Double</span></button>}
-          {canSplit && <button className="action-button is-split" onClick={onSplit}><span>{canResplit ? 'Resplit' : 'Split'}</span></button>}
+          <button
+            className={`action-button is-hit ${hintedAction === 'hit' ? 'is-hinted' : ''}`}
+            onClick={onHit}
+          >
+            <span>Hit</span>
+            {hintedAction === 'hit' && <small>Recommended</small>}
+          </button>
+          <button
+            className={`action-button is-stand ${hintedAction === 'stand' ? 'is-hinted' : ''}`}
+            onClick={onStand}
+          >
+            <span>Stand</span>
+            {hintedAction === 'stand' && <small>Recommended</small>}
+          </button>
+          {canDouble && (
+            <button
+              className={`action-button is-double ${hintedAction === 'double' ? 'is-hinted' : ''}`}
+              onClick={onDouble}
+            >
+              <span>Double</span>
+              {hintedAction === 'double' && <small>Recommended</small>}
+            </button>
+          )}
+          {canSplit && (
+            <button
+              className={`action-button is-split ${hintedAction === 'split' ? 'is-hinted' : ''}`}
+              onClick={onSplit}
+            >
+              <span>{canResplit ? 'Resplit' : 'Split'}</span>
+              {hintedAction === 'split' && <small>Recommended</small>}
+            </button>
+          )}
           <button
             className={`voice-action ${voiceInputEnabled ? 'is-on' : ''} ${['starting', 'listening', 'hearing', 'processing'].includes(voiceStatus) ? 'is-listening' : ''}`}
             onClick={onToggleVoiceInput}

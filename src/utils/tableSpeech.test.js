@@ -106,6 +106,7 @@ describe('table speech', () => {
     expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count', enabled: true });
     expect(parseVoiceCommand('count off')).toEqual({ type: 'count', enabled: false });
     expect(parseVoiceCommand('dealer give me a tip')).toEqual({ type: 'tip' });
+    expect(parseVoiceCommand('hint')).toEqual({ type: 'tip' });
     expect(parseVoiceCommand("what's the move")).toEqual({ type: 'tip' });
     expect(parseVoiceCommand('what should I do')).toEqual({ type: 'tip' });
     expect(parseVoiceCommand('dealer voice off')).toEqual({ type: 'speech', enabled: false });

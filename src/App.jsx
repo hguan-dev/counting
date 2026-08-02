@@ -87,6 +87,7 @@ export default function App() {
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [sickReactionKey, setSickReactionKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hintedAction, setHintedAction] = useState(null);
   const [insuranceBets, setInsuranceBets] = useState([]);
   const [evenMoneyQueue, setEvenMoneyQueue] = useState([]);
   
@@ -806,6 +807,7 @@ export default function App() {
   };
 
   const handleAction = (actionType) => {
+    setHintedAction(null);
     const curHand = getCurrentActiveHand();
     if (!warnStrategy) return executeRequestedAction(actionType);
 
@@ -1017,8 +1019,9 @@ export default function App() {
       if (recommendedAction === 'double' && hand.cards.length > 2) {
         recommendedAction = calculateTotal(hand.cards) >= 18 ? 'stand' : 'hit';
       }
+      setHintedAction(recommendedAction);
       announce(
-        `${evaluation.type} recommends ${recommendedAction}. ${evaluation.rule}`,
+        `${evaluation.type} recommends ${recommendedAction}. The recommended button is highlighted. ${evaluation.rule}`,
         { listenAfter: true },
       );
       return;
@@ -1635,6 +1638,7 @@ export default function App() {
           canDouble={getCurrentActiveHand()?.cards.length === 2}
           canSplit={canSplitCurrent()}
           canResplit={(playerSpots[activeSpotIndex]?.subHands.length || 0) > 1}
+          hintedAction={hintedAction}
           onInsurance={executeInsurance}
           onNextRound={beginNextRound}
           lastHeard={lastHeard}

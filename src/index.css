@@ -953,6 +953,34 @@ button:disabled {
   color: var(--gold-soft);
 }
 
+.action-button.is-hinted {
+  z-index: 2;
+  border-color: #f8dc82;
+  background: linear-gradient(180deg, #e8c55f, #9c7420);
+  color: #102619;
+  animation: optimalHintPulse 950ms ease-in-out infinite alternate;
+  box-shadow:
+    0 0 0 3px rgba(248, 220, 130, 0.25),
+    0 0 28px rgba(248, 220, 130, 0.62),
+    inset 0 1px rgba(255, 255, 255, 0.46);
+}
+
+.action-button.is-hinted small {
+  color: #102619;
+  opacity: 0.82;
+}
+
+@keyframes optimalHintPulse {
+  from {
+    filter: brightness(0.96);
+    transform: translateY(0) scale(1);
+  }
+  to {
+    filter: brightness(1.12);
+    transform: translateY(-2px) scale(1.045);
+  }
+}
+
 .voice-action {
   display: flex;
   min-height: 42px;

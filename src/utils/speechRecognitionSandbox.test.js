@@ -44,6 +44,7 @@ const COMMAND_CASES = [
   }],
   ['reload five hundred dollars', { type: 'reload', amount: 500 }],
   ['what is my bankroll', { type: 'bankroll' }],
+  ['hint', { type: 'tip' }],
   ['what is the true count', { type: 'count', enabled: true }],
   ['count off', { type: 'count', enabled: false }],
   ['microphone test', { type: 'micTest' }],
