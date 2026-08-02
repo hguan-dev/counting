@@ -1585,6 +1585,25 @@ button:disabled {
   pointer-events: none;
 }
 
+.confetti-burst::before,
+.confetti-burst::after {
+  position: absolute;
+  inset: 14%;
+  border: 5px solid rgba(250, 204, 21, 0.76);
+  border-radius: 50%;
+  box-shadow:
+    0 0 80px rgba(250, 204, 21, 0.72),
+    inset 0 0 90px rgba(56, 189, 248, 0.38);
+  content: "";
+  animation: celebrationPulse 2200ms cubic-bezier(0.16, 0.75, 0.25, 1) both;
+}
+
+.confetti-burst::after {
+  inset: 25%;
+  border-color: rgba(251, 113, 133, 0.72);
+  animation-delay: 240ms;
+}
+
 .confetti-burst i {
   position: absolute;
   top: 0;
@@ -1592,7 +1611,7 @@ button:disabled {
   height: 18px;
   border-radius: 3px;
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.24);
-  animation: confettiFall 1450ms cubic-bezier(0.16, 0.7, 0.35, 1) both;
+  animation: confettiFall 3100ms cubic-bezier(0.12, 0.64, 0.28, 1) both;
 }
 
 .confetti-burst i:nth-child(3n) {
@@ -1609,10 +1628,30 @@ button:disabled {
   pointer-events: none;
 }
 
+.sick-reaction::before {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(190, 242, 100, 0.62), transparent 48%),
+    rgba(63, 98, 18, 0.34);
+  content: "";
+  animation: sickScreenPulse 2900ms ease-out both;
+}
+
+.sick-reaction::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  content: "🤮";
+  filter: drop-shadow(0 18px 24px rgba(0, 0, 0, 0.4));
+  font-size: min(28vw, 18rem);
+  animation: sickGiantPulse 2800ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 .sick-reaction i {
   position: absolute;
   top: 0;
   filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.28));
   font-style: normal;
-  animation: sickReactionFall 1750ms cubic-bezier(0.2, 0.68, 0.3, 1) both;
+  animation: sickReactionFall 3400ms cubic-bezier(0.14, 0.62, 0.24, 1) both;
 }

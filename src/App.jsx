@@ -45,20 +45,21 @@ const isSoft17 = (cards) => {
   return hardSum === 7 && aces > 0;
 };
 
-const CONFETTI_PARTICLES = Array.from({ length: 96 }, (_, index) => ({
+const CONFETTI_PARTICLES = Array.from({ length: 320 }, (_, index) => ({
   color: ['#facc15', '#fb7185', '#38bdf8', '#4ade80', '#c084fc', '#f97316'][index % 6],
-  delay: `${(index % 12) * 28}ms`,
-  drift: `${((index * 47) % 220) - 110}px`,
-  left: `${3 + ((index * 37) % 94)}%`,
-  rotation: `${180 + ((index * 83) % 540)}deg`,
+  delay: `${(index % 28) * 40}ms`,
+  drift: `${((index * 47) % 420) - 210}px`,
+  left: `${1 + ((index * 37) % 98)}%`,
+  rotation: `${360 + ((index * 83) % 1080)}deg`,
+  scale: 0.7 + (index % 7) * 0.1,
 }));
 
-const SICK_REACTION_PARTICLES = Array.from({ length: 30 }, (_, index) => ({
-  delay: `${(index % 10) * 45}ms`,
-  drift: `${((index * 61) % 260) - 130}px`,
+const SICK_REACTION_PARTICLES = Array.from({ length: 150 }, (_, index) => ({
+  delay: `${(index % 22) * 58}ms`,
+  drift: `${((index * 61) % 460) - 230}px`,
   emoji: index % 3 === 0 ? '🤢' : '🤮',
-  left: `${2 + ((index * 43) % 96)}%`,
-  size: `${1.7 + (index % 5) * 0.22}rem`,
+  left: `${1 + ((index * 43) % 98)}%`,
+  size: `${1.8 + (index % 8) * 0.28}rem`,
 }));
 
 const formatCards = cards => cards.map(card => `${card.value}${card.suit}`).join(' ');
@@ -1201,15 +1202,33 @@ export default function App() {
           to { margin-top: 0; opacity: 1; filter: brightness(1); }
         }
         @keyframes confettiFall {
-          0% { opacity: 0; transform: translate3d(0, -12vh, 0) rotate(0deg) scale(0.75); }
-          8% { opacity: 1; }
-          100% { opacity: 0; transform: translate3d(var(--confetti-drift), 108vh, 0) rotate(var(--confetti-rotation)) scale(1); }
+          0% { opacity: 0; transform: translate3d(0, -16vh, 0) rotate(0deg) scale(0.55); }
+          7% { opacity: 1; }
+          72% { opacity: 1; }
+          100% { opacity: 0; transform: translate3d(var(--confetti-drift), 112vh, 0) rotate(var(--confetti-rotation)) scale(var(--particle-scale)); }
         }
         @keyframes sickReactionFall {
-          0% { opacity: 0; transform: translate3d(0, -14vh, 0) rotate(-12deg) scale(0.65); }
-          12% { opacity: 1; }
-          65% { opacity: 1; transform: translate3d(var(--sick-drift), 64vh, 0) rotate(10deg) scale(1.08); }
-          100% { opacity: 0; transform: translate3d(var(--sick-drift), 112vh, 0) rotate(-8deg) scale(0.92); }
+          0% { opacity: 0; transform: translate3d(0, -18vh, 0) rotate(-20deg) scale(0.45); }
+          8% { opacity: 1; }
+          58% { opacity: 1; transform: translate3d(var(--sick-drift), 58vh, 0) rotate(16deg) scale(1.18); }
+          84% { opacity: 1; }
+          100% { opacity: 0; transform: translate3d(var(--sick-drift), 116vh, 0) rotate(-14deg) scale(0.88); }
+        }
+        @keyframes celebrationPulse {
+          0%, 100% { opacity: 0; transform: scale(0.72); }
+          22% { opacity: 0.76; transform: scale(1.08); }
+          52% { opacity: 0.34; transform: scale(1.32); }
+        }
+        @keyframes sickScreenPulse {
+          0%, 100% { opacity: 0; }
+          18% { opacity: 0.68; }
+          45% { opacity: 0.2; }
+          67% { opacity: 0.52; }
+        }
+        @keyframes sickGiantPulse {
+          0%, 100% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(0.45); }
+          24% { opacity: 0.96; transform: translate(-50%, -50%) rotate(7deg) scale(1.08); }
+          62% { opacity: 0.72; transform: translate(-50%, -50%) rotate(-4deg) scale(0.92); }
         }
       `}</style>
 
@@ -1221,6 +1240,7 @@ export default function App() {
               style={{
                 '--confetti-drift': particle.drift,
                 '--confetti-rotation': particle.rotation,
+                '--particle-scale': particle.scale,
                 animationDelay: particle.delay,
                 backgroundColor: particle.color,
                 left: particle.left,
