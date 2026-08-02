@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   choosePreferredTableVoice,
-  getRecognitionErrorMessage,
+  configureRecognition,
+  getRecognitionFailure,
   getRecognitionResult,
   scoreTableVoice,
 } from '../utils/tableSpeech';
 import {
   KOKORO_VOICES,
+  preloadKokoroVoice,
   speakWithKokoro,
   stopKokoroSpeech,
 } from '../utils/kokoroVoice';
@@ -20,6 +22,22 @@ const SOUND_PATTERNS = {
   win: [[520, 0.07, 0], [660, 0.07, 0.08], [820, 0.12, 0.16]],
 };
 
+const DEALER_CARD_CALLS = [
+  'ace.',
+  '2.',
+  '3.',
+  '4.',
+  '5.',
+  '6.',
+  '7.',
+  '8.',
+  '9.',
+  '10.',
+  'jack.',
+  'queen.',
+  'king.',
+];
+
 export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [speechEnabled, setSpeechEnabled] = useState(true);
@@ -31,9 +49,11 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const [lastHeard, setLastHeard] = useState('');
   const [lastAnnouncement, setLastAnnouncement] = useState('');
   const [availableVoices, setAvailableVoices] = useState([]);
-  const [selectedVoiceName, setSelectedVoiceName] = useState(() => (
-    typeof window !== 'undefined' ? window.localStorage.getItem('blackjack-dealer-voice') || '' : ''
-  ));
+  const [selectedVoiceName, setSelectedVoiceName] = useState(() => {
+    if (typeof window === 'undefined') return 'kokoro:af_heart';
+    const storedVoice = window.localStorage.getItem('blackjack-dealer-voice');
+    return storedVoice?.startsWith('kokoro:') ? storedVoice : 'kokoro:af_heart';
+  });
   const [voiceSupported] = useState(() => (
     typeof window !== 'undefined'
     && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -46,6 +66,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const voiceInputEnabledRef = useRef(voiceInputEnabled);
   const speakingRef = useRef(false);
   const selectedVoiceNameRef = useRef(selectedVoiceName);
+  const voiceModelStatusRef = useRef(voiceModelStatus);
   const announcementIdRef = useRef(0);
   const recognitionActiveRef = useRef(false);
   const restartTimerRef = useRef(null);
@@ -55,6 +76,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   isListeningAllowedRef.current = isListeningAllowed;
   voiceInputEnabledRef.current = voiceInputEnabled;
   selectedVoiceNameRef.current = selectedVoiceName;
+  voiceModelStatusRef.current = voiceModelStatus;
 
   const playSound = (type) => {
     if (!soundEnabled || typeof window === 'undefined') return;
@@ -114,11 +136,10 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const ensureRecognition = () => {
     if (!voiceSupported || recognitionRef.current) return recognitionRef.current;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new Recognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 5;
-    recognition.lang = window.navigator?.language || 'en-US';
+    const recognition = configureRecognition(
+      new Recognition(),
+      window.navigator?.language || 'en-US',
+    );
     recognition.onstart = () => {
       recognitionActiveRef.current = true;
       restartAllowedRef.current = true;
@@ -145,15 +166,10 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       if (event.error === 'aborted' && (speakingRef.current || !voiceInputEnabledRef.current)) {
         return;
       }
-      const isBlocking = [
-        'audio-capture',
-        'language-not-supported',
-        'not-allowed',
-        'service-not-allowed',
-      ].includes(event.error);
-      restartAllowedRef.current = !isBlocking && event.error !== 'network';
-      setVoiceError(getRecognitionErrorMessage(event.error));
-      setVoiceStatus(isBlocking ? 'blocked' : 'error');
+      const failure = getRecognitionFailure(event.error);
+      restartAllowedRef.current = failure.restartAllowed;
+      setVoiceError(failure.message);
+      setVoiceStatus(failure.status);
     };
     recognition.onnomatch = () => {
       setVoiceError('Speech was detected, but no blackjack command matched.');
@@ -177,7 +193,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     return recognition;
   };
 
-  const toggleVoiceInput = () => {
+  const toggleVoiceInput = async () => {
     if (!voiceSupported) return;
     if (voiceInputEnabledRef.current) {
       voiceInputEnabledRef.current = false;
@@ -185,6 +201,19 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       setVoiceInputEnabled(false);
       stopListening();
       return;
+    }
+
+    if (window.navigator?.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await window.navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+      } catch {
+        restartAllowedRef.current = false;
+        setVoiceInputEnabled(false);
+        setVoiceStatus('blocked');
+        setVoiceError('Microphone access is blocked. Allow it in the browser site settings.');
+        return false;
+      }
     }
 
     ensureRecognition();
@@ -200,9 +229,10 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const announce = (text, { listenAfter = false } = {}) => {
     if (typeof window === 'undefined') return;
     const announcementId = ++announcementIdRef.current;
+    const usesKokoro = speechEnabled && selectedVoiceNameRef.current.startsWith('kokoro:');
     setLastAnnouncement(text);
-    if (recognitionRef.current) stopListening();
-    speakingRef.current = true;
+    if (recognitionRef.current && !usesKokoro) stopListening();
+    speakingRef.current = !usesKokoro;
     stopKokoroSpeech();
 
     let finished = false;
@@ -250,7 +280,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     };
 
     if (selectedVoiceNameRef.current.startsWith('kokoro:')) {
-      setVoiceModelStatus('loading');
+      if (voiceModelStatusRef.current !== 'ready') setVoiceModelStatus('loading');
       const kokoroSpeech = speakWithKokoro(
         text,
         selectedVoiceNameRef.current.replace('kokoro:', ''),
@@ -260,11 +290,13 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
             setVoiceModelProgress(Math.round(progress.progress || 0));
           }
         },
+        () => {
+          if (announcementId !== announcementIdRef.current) return;
+          if (recognitionRef.current) stopListening();
+          speakingRef.current = true;
+        },
       );
-      const firstUseTimeout = new Promise((_, reject) => {
-        window.setTimeout(() => reject(new Error('Kokoro is still warming up.')), 8000);
-      });
-      Promise.race([kokoroSpeech, firstUseTimeout])
+      kokoroSpeech
         .then(() => {
           setVoiceModelStatus('ready');
           setVoiceModelProgress(100);
@@ -273,6 +305,8 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
         .catch(() => {
           stopKokoroSpeech();
           setVoiceModelStatus('warming');
+          if (recognitionRef.current) stopListening();
+          speakingRef.current = true;
           speakWithSystemVoice();
         });
     } else {
@@ -296,14 +330,42 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
         .filter(voice => voice.lang.toLowerCase().startsWith('en'))
         .sort((left, right) => scoreTableVoice(right) - scoreTableVoice(left));
       setAvailableVoices(voices);
-      setSelectedVoiceName(current => (
-        current || choosePreferredTableVoice(voices)?.name || ''
-      ));
     };
     refreshVoices();
     window.speechSynthesis.addEventListener?.('voiceschanged', refreshVoices);
     return () => window.speechSynthesis.removeEventListener?.('voiceschanged', refreshVoices);
   }, []);
+
+  useEffect(() => {
+    if (!speechEnabled || !selectedVoiceName.startsWith('kokoro:')) return undefined;
+    let cancelled = false;
+    setVoiceModelStatus('loading');
+    setVoiceModelProgress(0);
+    preloadKokoroVoice(
+      selectedVoiceName.replace('kokoro:', ''),
+      DEALER_CARD_CALLS,
+      progress => {
+        if (cancelled) return;
+        if (progress?.status === 'progress') {
+          setVoiceModelProgress(Math.round((progress.progress || 0) * 0.7));
+        } else if (progress?.status === 'preparing') {
+          setVoiceModelProgress(70 + Math.round((progress.completed / progress.total) * 30));
+        }
+      }
+    )
+      .then(() => {
+        if (!cancelled) {
+          setVoiceModelStatus('ready');
+          setVoiceModelProgress(100);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setVoiceModelStatus('warming');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVoiceName, speechEnabled]);
 
   useEffect(() => {
     if (selectedVoiceName) {

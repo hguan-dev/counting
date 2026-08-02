@@ -1417,6 +1417,18 @@ button:disabled {
     border-radius: 70px 70px 16px 16px / 28px 28px 16px 16px;
   }
 
+  .game-board.is-betting {
+    min-height: 420px;
+  }
+
+  .game-board.is-betting .hand-zone {
+    min-height: 112px;
+  }
+
+  .game-board.is-betting .player-zone {
+    min-height: 128px;
+  }
+
   .table-rule-arc {
     top: 0.2rem;
     width: 104%;
@@ -1432,7 +1444,7 @@ button:disabled {
   }
 
   .dealer-zone {
-    margin-top: 0.2rem;
+    margin-top: 1.2rem;
   }
 
   .player-spots {

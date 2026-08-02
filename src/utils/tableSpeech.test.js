@@ -7,6 +7,7 @@ import {
   getRecognitionErrorMessage,
   getRecognitionResult,
   getSpokenCard,
+  getSpokenCountSummary,
   getSpokenHandTotal,
   parseVoiceAction,
   parseVoiceCommand,
@@ -24,6 +25,12 @@ describe('table speech', () => {
       new Card('♠', '9'),
     ])).toBe('soft 21');
     expect(getSpokenHandTotal([new Card('♥', '10'), new Card('♠', '7')])).toBe('17');
+  });
+
+  test('speaks the full count with approximate decks remaining', () => {
+    expect(getSpokenCountSummary(5, 2, 2.34)).toBe(
+      'The running count is 5. The true count is 2. Approximately 2.5 decks remaining.',
+    );
   });
 
   test('keeps dealer reveal calls short and card-by-card', () => {
@@ -76,6 +83,9 @@ describe('table speech', () => {
     expect(parseVoiceCommand('reload five hundred dollars')).toEqual({ type: 'reload', amount: 500 });
     expect(parseVoiceCommand('next round')).toEqual({ type: 'nextRound' });
     expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count' });
+    expect(parseVoiceCommand('dealer give me a tip')).toEqual({ type: 'tip' });
+    expect(parseVoiceCommand("what's the move")).toEqual({ type: 'tip' });
+    expect(parseVoiceCommand('what should I do')).toEqual({ type: 'tip' });
     expect(parseVoiceCommand('dealer voice off')).toEqual({ type: 'speech', enabled: false });
     expect(parseVoiceCommand('strategy guard on')).toEqual({ type: 'guard', enabled: true });
     expect(parseVoiceCommand('open the study guide')).toEqual({ type: 'studyGuide', open: true });

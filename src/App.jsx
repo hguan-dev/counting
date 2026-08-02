@@ -21,6 +21,7 @@ import {
   getDealerCardCall,
   getDealerFinishCall,
   getSpokenCard,
+  getSpokenCountSummary,
   getSpokenHandTotal,
 } from './utils/tableSpeech';
 
@@ -72,7 +73,6 @@ export default function App() {
 
   const {
     announce,
-    availableVoices,
     kokoroVoices,
     lastAnnouncement,
     lastHeard,
@@ -102,12 +102,9 @@ export default function App() {
     const handName = spot.subHands.length > 1
       ? `Split hand ${handIndex + 1}`
       : `Player spot ${spotIndex + 1}`;
-    const options = ['hit', 'stand'];
-    if (hand.cards.length === 2) options.push('double');
-    if (spot.subHands.length < 4 && canSplitHand(hand)) options.push('split');
     const prefix = lead ? `${lead} ` : '';
     announce(
-      `${prefix}${handName} has ${getSpokenHandTotal(hand.cards)}. Say ${options.join(', or ')}.`,
+      `${prefix}${handName} has ${getSpokenHandTotal(hand.cards)}.`,
       { listenAfter: true },
     );
   };
@@ -201,13 +198,13 @@ export default function App() {
         setEvenMoneyQueue(evenMoneyOffers);
         setGameState('evenMoney');
         announce(
-          `Dealer shows an ace. Spot ${evenMoneyOffers[0].spotIndex + 1} has blackjack. Say take even money, or play it out.`,
+          `Dealer shows an ace. Spot ${evenMoneyOffers[0].spotIndex + 1} has blackjack. Even money decision pending.`,
           { listenAfter: true },
         );
         return;
       }
       setGameState('insurance');
-      announce('Dealer shows an ace. Say buy insurance, or no insurance.', { listenAfter: true });
+      announce('Dealer shows an ace. Insurance decision pending.', { listenAfter: true });
       return;
     }
 
@@ -233,7 +230,7 @@ export default function App() {
       setGameState('resolved');
       playSound(netReturn > 0 ? 'chips' : 'loss');
       announce(
-        `Dealer has blackjack. ${getRoundOutcomeSummary(spots)}. Round complete. Say next round when ready.`,
+        `Dealer has blackjack. ${getRoundOutcomeSummary(spots)}. Round complete.`,
         { listenAfter: true },
       );
       return;
@@ -261,7 +258,7 @@ export default function App() {
       setBankroll(b => b + payoutReturn);
       setGameState('resolved');
       playSound('win');
-      announce(`Dealer upcard ${getSpokenCard(d1)}. Player blackjack. Say next round when ready.`, { listenAfter: true });
+      announce(`Dealer upcard ${getSpokenCard(d1)}. Player blackjack. Round complete.`, { listenAfter: true });
     } else {
       findFirstActiveHand(
         spots,
@@ -306,7 +303,7 @@ export default function App() {
 
     if (remainingOffers.length > 0) {
       announce(
-        `Spot ${remainingOffers[0].spotIndex + 1} has blackjack. Say take even money, or play it out.`,
+        `Spot ${remainingOffers[0].spotIndex + 1} has blackjack. Even money decision pending.`,
         { listenAfter: true },
       );
       return;
@@ -317,7 +314,7 @@ export default function App() {
     ));
     if (hasInsuranceEligibleHand) {
       setGameState('insurance');
-      announce('Even money decisions complete. Say buy insurance, or no insurance.', { listenAfter: true });
+      announce('Even money decisions complete. Insurance decision pending.', { listenAfter: true });
       return;
     }
 
@@ -366,7 +363,7 @@ export default function App() {
       setGameState('resolved');
       playSound(netReturn > 0 ? 'chips' : 'loss');
       announce(
-        `Dealer has blackjack. ${getRoundOutcomeSummary(spots)}. Round complete. Say next round when ready.`,
+        `Dealer has blackjack. ${getRoundOutcomeSummary(spots)}. Round complete.`,
         { listenAfter: true },
       );
     } else {
@@ -422,7 +419,7 @@ export default function App() {
     } else {
       setPlayerSpots(spots);
       announce(
-        `Player draws ${getSpokenCard(drawnCard)}. Total ${getSpokenHandTotal(hand.cards)}. Hit or stand?`,
+        `Player draws ${getSpokenCard(drawnCard)}. Total ${getSpokenHandTotal(hand.cards)}.`,
         { listenAfter: true },
       );
     }
@@ -522,7 +519,7 @@ export default function App() {
     shoeRef.current.visibleRunningCount += dInitialHand[1].countValue;
 
     let dHand = [...dInitialHand];
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 650));
     await announce(getDealerCardCall(dHand[1]));
 
     const dealerHasBlackjack = calculateTotal(dHand) === 21 && dHand.length === 2;
@@ -530,7 +527,7 @@ export default function App() {
 
     if (needsDealerDraw && !dealerHasBlackjack) {
       while (calculateTotal(dHand) < 17 || isSoft17(dHand)) {
-        await new Promise(r => setTimeout(r, 900)); 
+        await new Promise(r => setTimeout(r, 550));
         const drawnCard = shoeRef.current.draw();
         playSound('card');
         shoeRef.current.visibleRunningCount += drawnCard.countValue;
@@ -591,7 +588,7 @@ export default function App() {
       })
     )).join('. ');
     announce(
-      `${getDealerFinishCall(dHand)} ${outcomeSummary}. Round complete. Say next round when ready.`,
+      `${getDealerFinishCall(dHand)} ${outcomeSummary}. Round complete.`,
       { listenAfter: true },
     );
   };
@@ -618,7 +615,7 @@ export default function App() {
       } else {
         setPendingAction({ intended: actionType, optimal, type: 'play', category: evaluation.type, rule: evaluation.rule });
         announce(
-          `${actionType} is not the recommended play. Basic strategy says ${optimal}. Say proceed to use ${actionType}, or say correct play to go back.`,
+          `${actionType} is not the recommended play. ${evaluation.type} recommends ${optimal}. Strategy decision pending.`,
           { listenAfter: true },
         );
       }
@@ -666,9 +663,9 @@ export default function App() {
     )).join('. ')
   );
 
-  const getVoicePrompt = () => {
+  const getVoiceSummary = () => {
     if (pendingAction) {
-      return `${pendingAction.intended} differs from basic strategy ${pendingAction.optimal}. Say proceed, or correct play.`;
+      return `${pendingAction.intended} differs from the recommended ${pendingAction.optimal}. Strategy decision pending.`;
     }
 
     if (gameState === 'betting') {
@@ -676,28 +673,25 @@ export default function App() {
         .slice(0, numHands)
         .map((bet, index) => `spot ${index + 1}, ${bet} dollars`)
         .join('; ');
-      return `Betting is open with ${numHands} ${numHands === 1 ? 'spot' : 'spots'}: ${wagers}. Say one spot bet 25, or two spots bet 25 and 50. Then say deal.`;
+      return `Betting is open with ${numHands} ${numHands === 1 ? 'spot' : 'spots'}: ${wagers}.`;
     }
 
     if (gameState === 'evenMoney') {
       const offer = evenMoneyQueue[0];
-      return `Spot ${offer?.spotIndex + 1} has blackjack. Say take even money, or play it out.`;
+      return `Spot ${offer?.spotIndex + 1} has blackjack. Even money decision pending.`;
     }
 
     if (gameState === 'insurance') {
-      return 'Dealer shows an ace. Say buy insurance, or no insurance.';
+      return 'Dealer shows an ace. Insurance decision pending.';
     }
 
     if (gameState === 'playing') {
       const hand = getCurrentActiveHand();
-      const options = ['hit', 'stand'];
-      if (hand?.cards.length === 2) options.push('double');
-      if (canSplitCurrent()) options.push('split');
-      return `Active spot ${activeSpotIndex + 1}${playerSpots[activeSpotIndex]?.subHands.length > 1 ? `, split hand ${activeSubHandIndex + 1}` : ''}, total ${getSpokenHandTotal(hand?.cards)}. Available actions are ${options.join(', ')}.`;
+      return `Active spot ${activeSpotIndex + 1}${playerSpots[activeSpotIndex]?.subHands.length > 1 ? `, split hand ${activeSubHandIndex + 1}` : ''}, total ${getSpokenHandTotal(hand?.cards)}.`;
     }
 
     if (gameState === 'resolved') {
-      return `${getRoundOutcomeSummary()}. Bankroll ${bankroll} dollars. Say next round when ready.`;
+      return `${getRoundOutcomeSummary()}. Bankroll ${bankroll} dollars.`;
     }
 
     return gameState === 'shuffling'
@@ -720,7 +714,7 @@ export default function App() {
       || bets.some(bet => !Number.isFinite(bet) || bet < 5 || bet > 10000)
     ) {
       announce(
-        `Please give one wager for each spot, between 5 and 10000 dollars. For example, say ${spotCount === 2 ? 'two spots bet 25 and 50' : 'one spot bet 25'}.`,
+        `Please give one wager for each spot, between 5 and 10000 dollars.`,
         { listenAfter: true },
       );
       return;
@@ -729,29 +723,29 @@ export default function App() {
     updateSpotCount(spotCount);
     setSpotBets(current => current.map((bet, index) => bets[index] ?? bet));
     const summary = bets.map((bet, index) => `spot ${index + 1}, ${bet} dollars`).join('; ');
-    announce(`${spotCount} ${spotCount === 1 ? 'spot' : 'spots'} set. ${summary}. Say deal when ready.`, { listenAfter: true });
+    announce(`${spotCount} ${spotCount === 1 ? 'spot' : 'spots'} set. ${summary}.`, { listenAfter: true });
   };
 
   const beginNextRound = () => {
     setGameState('betting');
-    announce('Betting is open. Change the spots and wagers, or say deal to repeat them.', { listenAfter: true });
+    announce('Betting is open.', { listenAfter: true });
   };
 
   const handleVoiceCommand = (command) => {
     if (command?.type === 'unknown' || !command) {
-      announce(`I did not recognize that command. ${getVoicePrompt()}`, { listenAfter: true });
+      announce(`I did not recognize that command. ${getVoiceSummary()}`, { listenAfter: true });
       return;
     }
 
     if (command.type === 'help') {
       announce(
-        'You can set one or two spots with separate wagers, deal, hit, stand, double, split, buy or decline insurance, take or decline even money, start the next round, reload funds, ask for the count, bankroll, or status.',
+        'You can set one or two spots with separate wagers, deal, hit, stand, double, split, buy or decline insurance, take or decline even money, start the next round, reload funds, ask for a strategy tip, the count, bankroll, or status.',
         { listenAfter: true },
       );
       return;
     }
     if (command.type === 'status') {
-      announce(getVoicePrompt(), { listenAfter: true });
+      announce(getVoiceSummary(), { listenAfter: true });
       return;
     }
     if (command.type === 'micTest') {
@@ -762,13 +756,34 @@ export default function App() {
       return;
     }
     if (command.type === 'bankroll') {
-      announce(`Bankroll is ${bankroll} dollars. ${getVoicePrompt()}`, { listenAfter: true });
+      announce(`Bankroll is ${bankroll} dollars.`, { listenAfter: true });
+      return;
+    }
+    if (command.type === 'tip') {
+      const hand = getCurrentActiveHand();
+      if (gameState !== 'playing' || !hand || !dealerHand[0]) {
+        announce('Strategy advice is available during an active player hand.', { listenAfter: true });
+        return;
+      }
+      const evaluation = getDetailedPlay(hand.cards, dealerHand[0], shoeRef.current.trueCount);
+      let recommendedAction = evaluation.action;
+      if (recommendedAction === 'double' && hand.cards.length > 2) {
+        recommendedAction = calculateTotal(hand.cards) >= 18 ? 'stand' : 'hit';
+      }
+      announce(
+        `${evaluation.type} recommends ${recommendedAction}. ${evaluation.rule}`,
+        { listenAfter: true },
+      );
       return;
     }
     if (command.type === 'count') {
       setShowCount(true);
       announce(
-        `Running count ${shoeRef.current.visibleRunningCount}. True count ${shoeRef.current.trueCount}.`,
+        getSpokenCountSummary(
+          shoeRef.current.visibleRunningCount,
+          shoeRef.current.trueCount,
+          shoeRef.current.decksRemaining,
+        ),
         { listenAfter: true },
       );
       return;
@@ -811,7 +826,7 @@ export default function App() {
     if (pendingAction) {
       if (command.type === 'proceed') resolvePendingAction(true);
       else if (command.type === 'cancel') resolvePendingAction(false);
-      else announce(getVoicePrompt(), { listenAfter: true });
+      else announce(getVoiceSummary(), { listenAfter: true });
       return;
     }
 
@@ -820,23 +835,23 @@ export default function App() {
       else if (command.type === 'setSpots') {
         updateSpotCount(command.spotCount);
         announce(
-          `${command.spotCount} ${command.spotCount === 1 ? 'spot' : 'spots'} selected. Say ${command.spotCount === 2 ? 'bet 25 and 50' : 'bet 25'}, or say deal to keep the current wager.`,
+          `${command.spotCount} ${command.spotCount === 1 ? 'spot' : 'spots'} selected.`,
           { listenAfter: true },
         );
       } else if (command.type === 'deal') deal();
-      else announce(getVoicePrompt(), { listenAfter: true });
+      else announce(getVoiceSummary(), { listenAfter: true });
       return;
     }
 
     if (gameState === 'playing') {
       if (command.type !== 'action') {
-        announce(getVoicePrompt(), { listenAfter: true });
+        announce(getVoiceSummary(), { listenAfter: true });
         return;
       }
       if (command.action === 'double' && getCurrentActiveHand()?.cards.length !== 2) {
-        announce('Double is not available after a hit. Say hit or stand.', { listenAfter: true });
+        announce('Double is not available after a hit.', { listenAfter: true });
       } else if (command.action === 'split' && !canSplitCurrent()) {
-        announce('Split is not available for this hand. Say hit or stand.', { listenAfter: true });
+        announce('Split is not available for this hand.', { listenAfter: true });
       } else {
         handleAction(command.action);
       }
@@ -856,18 +871,18 @@ export default function App() {
       return;
     }
 
-    announce(getVoicePrompt(), { listenAfter: true });
+    announce(getVoiceSummary(), { listenAfter: true });
   };
 
   voiceCommandRef.current = handleVoiceCommand;
 
-  const handleVoiceToggle = () => {
+  const handleVoiceToggle = async () => {
     const enabling = !voiceInputEnabled;
-    toggleVoiceInput();
-    if (enabling) {
+    const enabled = await toggleVoiceInput();
+    if (enabling && enabled) {
       playSound('chips');
       announce(
-        `Hands free mode on. Say help at any time. ${getVoicePrompt()}`,
+        `Hands free mode on. ${getVoiceSummary()}`,
         { listenAfter: true },
       );
     }
@@ -980,29 +995,22 @@ export default function App() {
           <button className="topbar-button" onClick={() => setShowCount(!showCount)}>{showCount ? "Hide Count" : "Peek Count"}</button>
           <button className={`topbar-button ${soundEnabled ? 'is-on' : ''}`} onClick={() => setSoundEnabled(current => !current)}>{soundEnabled ? 'Sound on' : 'Sound off'}</button>
           <button className={`topbar-button ${speechEnabled ? 'is-on' : ''}`} onClick={() => setSpeechEnabled(current => !current)}>{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</button>
-          {(kokoroVoices.length > 0 || availableVoices.length > 0) && (
+          {kokoroVoices.length > 0 && (
             <label className="voice-picker">
               <span>
                 {voiceModelStatus === 'loading'
                   ? `Loading AI voice${voiceModelProgress ? ` ${voiceModelProgress}%` : '…'}`
-                  : voiceModelStatus === 'warming' ? 'AI voice warming up' : 'Voice'}
+                  : voiceModelStatus === 'warming' ? 'AI voice retrying' : 'AI voice ready'}
               </span>
               <select
                 aria-label="Dealer voice"
                 value={selectedVoiceName}
                 onChange={event => setSelectedVoiceName(event.target.value)}
               >
-                <optgroup label="Kokoro studio voices · downloads on first use">
+                <optgroup label="Kokoro studio voices">
                   {kokoroVoices.map(voice => (
                     <option key={voice.id} value={`kokoro:${voice.id}`}>
                       {voice.label}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Fast device voices">
-                  {availableVoices.map(voice => (
-                    <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
-                      {voice.name}
                     </option>
                   ))}
                 </optgroup>
@@ -1086,12 +1094,12 @@ export default function App() {
         <div className="count-panel" aria-live="polite">
           <div><span>Running count</span><strong>{shoeRef.current.visibleRunningCount > 0 ? '+' : ''}{shoeRef.current.visibleRunningCount}</strong></div>
           <div><span>True count</span><strong>{shoeRef.current.trueCount > 0 ? '+' : ''}{shoeRef.current.trueCount}</strong></div>
-          <div><span>Decks left</span><strong>{Math.max(1, shoeRef.current.cards.length / 52).toFixed(1)}</strong></div>
+          <div><span>Decks left</span><strong>{shoeRef.current.decksRemaining.toFixed(1)}</strong></div>
         </div>
       )}
 
       {/* GAME BOARD TABLE */}
-      <div className="game-board">
+      <div className={`game-board is-${gameState}`}>
         <svg className="table-rule-arc" viewBox="0 0 900 170" aria-hidden="true">
           <defs>
             <path id="table-rule-path" d="M 55 150 Q 450 -90 845 150" />

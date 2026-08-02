@@ -35,8 +35,11 @@ export class Shoe {
   }
 
   get trueCount() {
-    const decksRemaining = Math.max(1, this.cards.length / 52);
-    return Math.round(this.visibleRunningCount / decksRemaining);
+    return Math.round(this.visibleRunningCount / Math.max(1, this.decksRemaining));
+  }
+
+  get decksRemaining() {
+    return this.cards.length / 52;
   }
 
   needsShuffle() {
