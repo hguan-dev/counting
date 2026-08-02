@@ -73,7 +73,6 @@ export default function App() {
 
   const {
     announce,
-    availableVoices,
     kokoroVoices,
     lastAnnouncement,
     lastHeard,
@@ -520,7 +519,7 @@ export default function App() {
     shoeRef.current.visibleRunningCount += dInitialHand[1].countValue;
 
     let dHand = [...dInitialHand];
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 650));
     await announce(getDealerCardCall(dHand[1]));
 
     const dealerHasBlackjack = calculateTotal(dHand) === 21 && dHand.length === 2;
@@ -528,7 +527,7 @@ export default function App() {
 
     if (needsDealerDraw && !dealerHasBlackjack) {
       while (calculateTotal(dHand) < 17 || isSoft17(dHand)) {
-        await new Promise(r => setTimeout(r, 900)); 
+        await new Promise(r => setTimeout(r, 550));
         const drawnCard = shoeRef.current.draw();
         playSound('card');
         shoeRef.current.visibleRunningCount += drawnCard.countValue;
@@ -996,29 +995,22 @@ export default function App() {
           <button className="topbar-button" onClick={() => setShowCount(!showCount)}>{showCount ? "Hide Count" : "Peek Count"}</button>
           <button className={`topbar-button ${soundEnabled ? 'is-on' : ''}`} onClick={() => setSoundEnabled(current => !current)}>{soundEnabled ? 'Sound on' : 'Sound off'}</button>
           <button className={`topbar-button ${speechEnabled ? 'is-on' : ''}`} onClick={() => setSpeechEnabled(current => !current)}>{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</button>
-          {(kokoroVoices.length > 0 || availableVoices.length > 0) && (
+          {kokoroVoices.length > 0 && (
             <label className="voice-picker">
               <span>
                 {voiceModelStatus === 'loading'
                   ? `Loading AI voice${voiceModelProgress ? ` ${voiceModelProgress}%` : '…'}`
-                  : voiceModelStatus === 'warming' ? 'AI voice warming up' : 'Voice'}
+                  : voiceModelStatus === 'warming' ? 'AI voice retrying' : 'AI voice ready'}
               </span>
               <select
                 aria-label="Dealer voice"
                 value={selectedVoiceName}
                 onChange={event => setSelectedVoiceName(event.target.value)}
               >
-                <optgroup label="Kokoro studio voices · downloads on first use">
+                <optgroup label="Kokoro studio voices">
                   {kokoroVoices.map(voice => (
                     <option key={voice.id} value={`kokoro:${voice.id}`}>
                       {voice.label}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Fast device voices">
-                  {availableVoices.map(voice => (
-                    <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
-                      {voice.name}
                     </option>
                   ))}
                 </optgroup>
@@ -1102,12 +1094,12 @@ export default function App() {
         <div className="count-panel" aria-live="polite">
           <div><span>Running count</span><strong>{shoeRef.current.visibleRunningCount > 0 ? '+' : ''}{shoeRef.current.visibleRunningCount}</strong></div>
           <div><span>True count</span><strong>{shoeRef.current.trueCount > 0 ? '+' : ''}{shoeRef.current.trueCount}</strong></div>
-          <div><span>Decks left</span><strong>{Math.max(1, shoeRef.current.cards.length / 52).toFixed(1)}</strong></div>
+          <div><span>Decks left</span><strong>{shoeRef.current.decksRemaining.toFixed(1)}</strong></div>
         </div>
       )}
 
       {/* GAME BOARD TABLE */}
-      <div className="game-board">
+      <div className={`game-board is-${gameState}`}>
         <svg className="table-rule-arc" viewBox="0 0 900 170" aria-hidden="true">
           <defs>
             <path id="table-rule-path" d="M 55 150 Q 450 -90 845 150" />
