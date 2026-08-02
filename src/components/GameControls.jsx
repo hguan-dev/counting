@@ -1,7 +1,7 @@
 export default function GameControls({
   gameState,
-  initialBet,
-  setInitialBet,
+  spotBets,
+  setSpotBet,
   numHands,
   setNumHands,
   onDeal,
@@ -11,20 +11,19 @@ export default function GameControls({
   onSplit,
   canDouble,
   canSplit,
+  canResplit,
   onInsurance,
-  onNextRound
+  onNextRound,
+  lastHeard,
+  onToggleVoiceInput,
+  voiceInputEnabled,
+  voiceStatus,
+  voiceSupported,
 }) {
   return (
     <div className="game-controls" aria-label="Game controls">
       {gameState === 'betting' && (
         <div className="betting-controls">
-          <label className="control-field" htmlFor="wager">
-            <span>Wager per spot</span>
-            <span className="control-input has-prefix">
-              <b>$</b>
-              <input id="wager" aria-label="Wager amount" type="number" value={initialBet} onChange={(e) => setInitialBet(Number(e.target.value))} step="25" min="25" />
-            </span>
-          </label>
           <label className="control-field" htmlFor="spots">
             <span>Player spots</span>
             <select id="spots" aria-label="Number of spots" value={numHands} onChange={(e) => setNumHands(Number(e.target.value))}>
@@ -32,9 +31,27 @@ export default function GameControls({
               <option value={2}>2 spots</option>
             </select>
           </label>
+          {Array.from({ length: numHands }, (_, spotIndex) => (
+            <label className="control-field" htmlFor={`wager-${spotIndex + 1}`} key={spotIndex}>
+              <span>Spot {spotIndex + 1} wager</span>
+              <span className="control-input has-prefix">
+                <b>$</b>
+                <input
+                  id={`wager-${spotIndex + 1}`}
+                  aria-label={`Spot ${spotIndex + 1} wager amount`}
+                  type="number"
+                  value={spotBets[spotIndex]}
+                  onChange={(event) => setSpotBet(spotIndex, Number(event.target.value))}
+                  step="5"
+                  min="5"
+                  max="10000"
+                />
+              </span>
+            </label>
+          ))}
           <button className="deal-button" onClick={onDeal}>
             <span>Deal cards</span>
-            <small>${initialBet * numHands} total</small>
+            <small>${spotBets.slice(0, numHands).reduce((sum, bet) => sum + bet, 0)} total</small>
           </button>
         </div>
       )}
@@ -44,7 +61,7 @@ export default function GameControls({
           <div className="decision-copy">
             <span className="decision-kicker">Dealer shows an Ace</span>
             <strong>Insure eligible hands?</strong>
-            <small>Costs half your wager. Pays 2:1 only if the dealer has blackjack.</small>
+            <small>Costs half each eligible spot’s wager. Pays 2:1 only if the dealer has blackjack.</small>
           </div>
           <button className="decision-button is-gold" onClick={() => onInsurance(true)}>Buy insurance</button>
           <button className="decision-button" onClick={() => onInsurance(false)}>No insurance</button>
@@ -56,7 +73,25 @@ export default function GameControls({
           <button className="action-button is-hit" onClick={onHit}><span>Hit</span><small>Take a card</small></button>
           <button className="action-button is-stand" onClick={onStand}><span>Stand</span><small>Hold total</small></button>
           {canDouble && <button className="action-button is-double" onClick={onDouble}><span>Double</span><small>One card</small></button>}
-          {canSplit && <button className="action-button is-split" onClick={onSplit}><span>Split</span><small>Two hands</small></button>}
+          {canSplit && <button className="action-button is-split" onClick={onSplit}><span>{canResplit ? 'Resplit' : 'Split'}</span><small>Up to 4 hands</small></button>}
+          <button
+            className={`voice-action ${voiceInputEnabled ? 'is-on' : ''} ${voiceStatus === 'listening' ? 'is-listening' : ''}`}
+            onClick={onToggleVoiceInput}
+            disabled={!voiceSupported}
+            aria-pressed={voiceInputEnabled}
+          >
+            <span className="mic-icon" aria-hidden="true">●</span>
+            <span>
+              {voiceSupported
+                ? voiceStatus === 'blocked'
+                  ? 'Microphone blocked'
+                  : voiceStatus === 'listening'
+                    ? 'Listening…'
+                    : voiceInputEnabled ? 'Voice commands on' : 'Enable voice commands'
+                : 'Voice commands unavailable'}
+              <small>{lastHeard ? `Heard: “${lastHeard}”` : 'All table actions are available by voice'}</small>
+            </span>
+          </button>
         </div>
       )}
 

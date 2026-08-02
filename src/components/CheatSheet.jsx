@@ -164,6 +164,7 @@ export default function CheatSheet({ onClose }) {
                 <li>Dealer hits soft 17 (H17).</li>
                 <li>Blackjack pays 3:2.</li>
                 <li>Double after split is allowed.</li>
+                <li>Pairs may be resplit to a maximum of four hands.</li>
                 <li>Split Aces receive one card each.</li>
               </ul>
             </details>
@@ -176,6 +177,17 @@ export default function CheatSheet({ onClose }) {
                 <li>Splitting tens or failing to split eights.</li>
                 <li>Ignoring whether a hand is soft when choosing an action.</li>
                 <li>Changing bet size from emotion rather than a defined bankroll plan.</li>
+              </ul>
+            </details>
+
+            <details>
+              <summary>Hands-free & vision-free play</summary>
+              <ul className="guide-list">
+                <li>Enable <strong>Hands-free mode</strong> once, then say “help” at any time.</li>
+                <li>Configure unequal wagers naturally: “two spots, bet 25 and 50.”</li>
+                <li>Every round decision is supported: hit, stand, double, split, insurance, even money, and next round.</li>
+                <li>Say “status,” “bankroll,” or “count” to hear the current table state.</li>
+                <li>Spoken prompts pause microphone listening while the dealer talks, then resume automatically.</li>
               </ul>
             </details>
           </>

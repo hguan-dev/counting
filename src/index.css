@@ -75,7 +75,7 @@ button:disabled {
 
 .header-bar {
   display: grid !important;
-  grid-template-columns: minmax(230px, 1fr) auto minmax(430px, 1fr);
+  grid-template-columns: minmax(350px, 0.85fr) auto minmax(0, 1.35fr);
   gap: 1.5rem;
   align-items: center !important;
   padding: 0 0 1rem !important;
@@ -126,6 +126,10 @@ button:disabled {
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.06);
 }
 
+.bankroll-card:hover {
+  border-color: rgba(232, 197, 106, 0.55);
+}
+
 .bankroll-card span {
   color: var(--muted);
   font-size: 0.67rem;
@@ -140,8 +144,22 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.bankroll-card small {
+  margin-top: 0.12rem;
+  color: rgba(232, 197, 106, 0.74);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
   justify-content: flex-end;
+  gap: 0.48rem;
+  flex-wrap: wrap;
 }
 
 .toggle-label {
@@ -151,6 +169,36 @@ button:disabled {
   color: var(--muted);
   font-size: 0.78rem;
   cursor: pointer;
+}
+
+.voice-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.voice-picker select {
+  width: min(168px, 24vw);
+  min-height: 34px;
+  padding: 0.42rem 1.65rem 0.42rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(4, 28, 18, 0.86);
+  color: var(--cream);
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.voice-picker select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .topbar-button,
@@ -164,10 +212,113 @@ button:disabled {
   font-weight: 700;
 }
 
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
 .topbar-button.is-featured {
   border-color: rgba(232, 197, 106, 0.42);
   background: rgba(232, 197, 106, 0.12);
   color: var(--gold-soft);
+}
+
+.topbar-button.is-on {
+  border-color: rgba(110, 231, 153, 0.3);
+  color: #b7f2cc;
+}
+
+.reload-panel {
+  display: flex;
+  width: min(760px, 100%);
+  margin: 0.7rem auto 0;
+  padding: 0.72rem;
+  border: 1px solid rgba(232, 197, 106, 0.25);
+  border-radius: 13px;
+  background: linear-gradient(180deg, rgba(11, 54, 35, 0.98), rgba(3, 27, 17, 0.98));
+  align-items: center;
+  gap: 0.7rem;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28);
+}
+
+.reload-copy {
+  display: flex;
+  min-width: 130px;
+  flex-direction: column;
+}
+
+.reload-copy .eyebrow {
+  margin: 0;
+}
+
+.reload-copy strong {
+  margin-top: 0.08rem;
+  font-family: Georgia, serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.reload-presets {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.reload-presets button,
+.reload-confirm {
+  min-height: 40px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--cream);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.reload-presets button.is-selected {
+  border-color: rgba(232, 197, 106, 0.56);
+  background: rgba(232, 197, 106, 0.13);
+  color: var(--gold-soft);
+}
+
+.reload-custom {
+  display: flex;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  align-items: center;
+}
+
+.reload-custom span {
+  padding-left: 0.65rem;
+  color: var(--muted);
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.reload-custom input {
+  width: 94px;
+  height: 100%;
+  padding: 0 0.6rem;
+  border: 0;
+  background: transparent;
+  color: var(--cream);
+  text-align: right;
+}
+
+.reload-confirm {
+  border-color: rgba(137, 244, 178, 0.45);
+  background: linear-gradient(180deg, #45d687, #188a51);
+  color: #031a0f;
 }
 
 .count-panel {
@@ -654,7 +805,8 @@ button:disabled {
 }
 
 .action-cluster {
-  max-width: 660px;
+  max-width: 780px;
+  flex-wrap: wrap;
 }
 
 .action-button {
@@ -677,6 +829,59 @@ button:disabled {
 .action-button.is-split {
   border-color: rgba(232, 197, 106, 0.42);
   color: var(--gold-soft);
+}
+
+.voice-action {
+  display: flex;
+  min-height: 42px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--muted);
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 100%;
+  gap: 0.55rem;
+  font-size: 0.69rem;
+  font-weight: 800;
+}
+
+.voice-action > span:last-child {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.voice-action small {
+  margin-top: 0.08rem;
+  font-size: 0.58rem;
+  font-weight: 650;
+  opacity: 0.68;
+}
+
+.mic-icon {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 0.45rem;
+  place-items: center;
+}
+
+.voice-action.is-on {
+  border-color: rgba(110, 231, 153, 0.34);
+  color: #b7f2cc;
+}
+
+.voice-action.is-on .mic-icon {
+  color: #6ee799;
+}
+
+.voice-action.is-listening .mic-icon {
+  animation: microphonePulse 900ms ease-in-out infinite alternate;
 }
 
 .insurance-controls {
@@ -1028,6 +1233,11 @@ button:disabled {
   to { opacity: 1; transform: rotate(8deg); }
 }
 
+@keyframes microphonePulse {
+  from { box-shadow: 0 0 0 0 rgba(110, 231, 153, 0.45); }
+  to { box-shadow: 0 0 0 7px rgba(110, 231, 153, 0); }
+}
+
 @media (max-width: 1100px) {
   .header-bar {
     grid-template-columns: 1fr auto;
@@ -1095,8 +1305,41 @@ button:disabled {
     flex: 1;
   }
 
+  .voice-picker {
+    flex: 1 1 190px;
+  }
+
+  .voice-picker select {
+    width: 100%;
+  }
+
   .count-panel {
     margin-top: 0;
+  }
+
+  .reload-panel {
+    padding: 0.65rem;
+    flex-wrap: wrap;
+  }
+
+  .reload-copy {
+    width: 100%;
+  }
+
+  .reload-presets {
+    flex: 1 1 100%;
+  }
+
+  .reload-presets button {
+    flex: 1;
+  }
+
+  .reload-custom {
+    flex: 1;
+  }
+
+  .reload-custom input {
+    width: 100%;
   }
 
   .game-board {
