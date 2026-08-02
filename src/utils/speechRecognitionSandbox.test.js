@@ -27,6 +27,7 @@ const COMMAND_CASES = [
   ['stack it', { type: 'stackBet' }],
   ['stack it up', { type: 'stackAndRun' }],
   ['bang', { type: 'celebrate' }],
+  ['baaannngg', { type: 'celebrate' }],
   ['good boy', { type: 'celebrate' }],
   ['fuck', { type: 'sickReaction' }],
   ['sickening', { type: 'sickReaction' }],
@@ -62,7 +63,7 @@ const recognitionEvent = (transcripts, isFinal = true) => {
 };
 
 describe('speech recognition sandbox', () => {
-  test('configures the browser recognizer for hands-free command capture', () => {
+  test('configures the browser recognizer for voice-mode command capture', () => {
     const fakeRecognition = {};
     expect(configureRecognition(fakeRecognition, 'en-GB')).toBe(fakeRecognition);
     expect(fakeRecognition).toMatchObject({

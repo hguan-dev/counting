@@ -1161,7 +1161,7 @@ export default function App() {
     if (enabling && enabled) {
       playSound('chips');
       announce(
-        `Hands free mode on. ${getVoiceSummary()}`,
+        `Voice mode on. ${getVoiceSummary()}`,
         { listenAfter: true },
       );
     }
@@ -1253,11 +1253,6 @@ export default function App() {
           84% { opacity: 1; }
           100% { opacity: 0; transform: translate3d(var(--sick-drift), 116vh, 0) rotate(-14deg) scale(0.88); }
         }
-        @keyframes celebrationPulse {
-          0%, 100% { opacity: 0; transform: scale(0.72); }
-          22% { opacity: 0.76; transform: scale(1.08); }
-          52% { opacity: 0.34; transform: scale(1.32); }
-        }
         @keyframes sickScreenPulse {
           0%, 100% { opacity: 0; }
           18% { opacity: 0.68; }
@@ -1325,10 +1320,17 @@ export default function App() {
       {/* HEADER BAR */}
       <div className="header-bar">
         <div className="brand-lockup">
-          <span className="eyebrow">Count lab</span>
-          <div className="brand-line">
-            <h1>BLACKJACK</h1>
-            <span className="table-rules">6 Decks · H17 · Blackjack 3:2</span>
+          <img
+            className="brand-mark"
+            src={`${import.meta.env.BASE_URL}brand/count-lab-logo.png`}
+            alt=""
+          />
+          <div className="brand-copy">
+            <span className="eyebrow">Blackjack training</span>
+            <div className="brand-line">
+              <h1>COUNT LAB</h1>
+              <span className="table-rules">6 Decks · H17 · Blackjack 3:2</span>
+            </div>
           </div>
         </div>
         <button
@@ -1350,14 +1352,46 @@ export default function App() {
           </label>
           <button className="topbar-button is-featured" onClick={() => setShowCheatSheet(true)}>Study Guide</button>
           <button className="topbar-button" onClick={() => setShowCount(!showCount)}>{showCount ? "Hide Count" : "Peek Count"}</button>
-          <button className={`topbar-button ${soundEnabled ? 'is-on' : ''}`} onClick={() => setSoundEnabled(current => !current)}>{soundEnabled ? 'Sound on' : 'Sound off'}</button>
-          <button className={`topbar-button ${speechEnabled ? 'is-on' : ''}`} onClick={() => setSpeechEnabled(current => !current)}>{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</button>
           <button
-            className={`topbar-button ${isFullscreen ? 'is-on' : ''}`}
+            className={`topbar-button header-icon-button ${soundEnabled ? 'is-on' : ''}`}
+            onClick={() => setSoundEnabled(current => !current)}
+            aria-label={soundEnabled ? 'Turn sound off' : 'Turn sound on'}
+            aria-pressed={soundEnabled}
+            title={soundEnabled ? 'Sound on' : 'Sound off'}
+          >
+            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+              {soundEnabled
+                ? <path d="M16 8.2a5 5 0 0 1 0 7.6M18.7 5.8a8.2 8.2 0 0 1 0 12.4" />
+                : <path d="m16 9 5 6m0-6-5 6" />}
+            </svg>
+            <span className="sr-only">{soundEnabled ? 'Sound on' : 'Sound off'}</span>
+          </button>
+          <button
+            className={`topbar-button header-icon-button ${speechEnabled ? 'is-on' : ''}`}
+            onClick={() => setSpeechEnabled(current => !current)}
+            aria-label={speechEnabled ? 'Turn dealer voice off' : 'Turn dealer voice on'}
+            aria-pressed={speechEnabled}
+            title={speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}
+          >
+            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5h16v12H9l-5 3V5Z" />
+              <path d="M8 11h1m2.5 0h1m2.5 0h1" />
+              {!speechEnabled && <path d="M3 3 21 21" />}
+            </svg>
+            <span className="sr-only">{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</span>
+          </button>
+          <button
+            className={`topbar-button header-icon-button ${isFullscreen ? 'is-on' : ''}`}
             onClick={() => toggleFullscreen()}
             aria-pressed={isFullscreen}
+            aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+            title={isFullscreen ? 'Exit full screen' : 'Full screen'}
           >
-            {isFullscreen ? 'Exit full screen' : 'Full screen'}
+            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5" />
+            </svg>
+            <span className="sr-only">{isFullscreen ? 'Exit full screen' : 'Full screen'}</span>
           </button>
           {kokoroVoices.length > 0 && (
             <label className="voice-picker">
@@ -1396,10 +1430,20 @@ export default function App() {
                     ? 'Processing…'
                     : ['starting', 'listening'].includes(voiceStatus)
                       ? 'Listening…'
-                      : voiceInputEnabled ? 'Hands-free on' : 'Hands-free mode'
+                      : voiceInputEnabled ? 'Voice mode on' : 'Voice mode'
               : 'Voice unavailable'}
           </button>
-          <button className="topbar-button" onClick={() => loggerRef.current.downloadCSV()}>Export</button>
+          <button
+            className="topbar-button header-icon-button"
+            onClick={() => loggerRef.current.downloadCSV()}
+            aria-label="Export session log"
+            title="Export session log"
+          >
+            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4" />
+            </svg>
+            <span className="sr-only">Export session log</span>
+          </button>
         </div>
       </div>
 

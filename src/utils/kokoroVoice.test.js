@@ -12,6 +12,7 @@ describe('Kokoro dealer voices', () => {
       'am_fenrir',
     ]);
     expect(new Set(KOKORO_VOICES.map(voice => voice.id)).size).toBe(KOKORO_VOICES.length);
+    expect(KOKORO_VOICES.every(voice => !/grade/i.test(voice.label))).toBe(true);
     expect(preloadKokoro).toBeTypeOf('function');
     expect(preloadKokoroVoice).toBeTypeOf('function');
   });

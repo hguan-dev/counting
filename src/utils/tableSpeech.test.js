@@ -92,6 +92,8 @@ describe('table speech', () => {
     expect(parseVoiceCommand('stack it')).toEqual({ type: 'stackBet' });
     expect(parseVoiceCommand('stack it up')).toEqual({ type: 'stackAndRun' });
     expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });
+    expect(parseVoiceCommand('baaannngg')).toEqual({ type: 'celebrate' });
+    expect(parseVoiceCommand('BAAANNGG!')).toEqual({ type: 'celebrate' });
     expect(parseVoiceCommand('good boy')).toEqual({ type: 'celebrate' });
     expect(parseVoiceCommand('fuck')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('sickening')).toEqual({ type: 'sickReaction' });

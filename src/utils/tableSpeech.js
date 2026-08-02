@@ -196,7 +196,7 @@ export const parseVoiceCommand = (transcript) => {
   if (/\bstack\s+it\b/.test(normalized)) return { type: 'stackBet' };
   if (/^(?:next|next\s+round|new\s+round|deal\s+again)$/.test(normalized)) return { type: 'nextRound' };
   if (/\b(?:deal|deal\s+cards|start\s+round)\b/.test(normalized)) return { type: 'deal' };
-  if (/\bbang\b|\bgood\s+boy\b/.test(normalized)) return { type: 'celebrate' };
+  if (/\bba+n+g+\b|\bgood\s+boy\b/.test(normalized)) return { type: 'celebrate' };
   if (/\b(?:bro|fuck|seriously|sickening|sick)\b|\bare\s+you\s+serious\b/.test(normalized)) return { type: 'sickReaction' };
   if (/\b(?:proceed|do\s+it|play\s+anyway)\b/.test(normalized)) return { type: 'proceed' };
   if (/\b(?:correct\s+play|go\s+back|cancel)\b/.test(normalized)) return { type: 'cancel' };
@@ -292,7 +292,7 @@ export const getRecognitionErrorMessage = (errorCode) => {
     'not-allowed': 'Microphone access is blocked. Allow it in the browser site settings.',
     'service-not-allowed': 'The browser speech recognition service is blocked.',
   };
-  return messages[errorCode] || 'Speech recognition stopped unexpectedly. Try turning hands-free mode off and on.';
+  return messages[errorCode] || 'Speech recognition stopped unexpectedly. Try turning voice mode off and on.';
 };
 
 export const getRecognitionFailure = (errorCode) => {

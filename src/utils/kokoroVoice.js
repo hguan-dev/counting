@@ -1,9 +1,9 @@
 import { HEART_TABLE_PHRASES } from './heartVoicePhrases';
 
 export const KOKORO_VOICES = [
-  { id: 'af_heart', label: 'Heart · American · A grade' },
-  { id: 'af_bella', label: 'Bella · American · A− grade' },
-  { id: 'bf_emma', label: 'Emma · British · B− grade' },
+  { id: 'af_heart', label: 'Heart · American · female' },
+  { id: 'af_bella', label: 'Bella · American · female' },
+  { id: 'bf_emma', label: 'Emma · British · female' },
   { id: 'am_fenrir', label: 'Fenrir · American · male' },
 ];
 

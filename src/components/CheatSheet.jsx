@@ -181,9 +181,9 @@ export default function CheatSheet({ onClose }) {
             </details>
 
             <details>
-              <summary>Hands-free & vision-free play</summary>
+              <summary>Voice mode & vision-free play</summary>
               <ul className="guide-list">
-                <li>Enable <strong>Hands-free mode</strong> once, then say “help” at any time.</li>
+                <li>Enable <strong>Voice mode</strong> once, then say “help” at any time.</li>
                 <li>Configure unequal wagers naturally: “two spots, bet 25 and 50.”</li>
                 <li>Every round decision is supported: hit, stand, double, split, insurance, even money, and next round.</li>
                 <li>Say “status,” “bankroll,” or “count” to hear the current table state.</li>
