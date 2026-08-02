@@ -3,7 +3,7 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
+  color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
   background-color: #242424;
 
@@ -24,8 +24,6 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }
@@ -54,15 +52,64 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+button {
+  touch-action: manipulation;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.12);
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    position: relative !important;
+    min-height: 100dvh;
+    height: auto !important;
+    padding: 1rem !important;
+    overflow: auto !important;
+    gap: 1.25rem;
   }
-  a:hover {
-    color: #747bff;
+
+  .header-bar,
+  .header-actions,
+  .game-controls {
+    flex-wrap: wrap;
   }
-  button {
-    background-color: #f9f9f9;
+
+  .header-bar {
+    gap: 1rem;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .game-board {
+    gap: 1.75rem !important;
+  }
+
+  .player-spots {
+    flex-wrap: wrap;
+    gap: 1.25rem !important;
+  }
+
+  .game-controls {
+    padding: 1rem !important;
+    gap: 0.75rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

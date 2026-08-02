@@ -1,6 +1,5 @@
 // src/models/BlackjackEngine.js
 import { Shoe } from './Shoe';
-import { calculateTotal } from '../utils/strategyEngine';
 
 export class BlackjackEngine {
   constructor(decks = 6) {

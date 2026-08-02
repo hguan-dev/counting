@@ -18,13 +18,13 @@ export default function GameControls({
   const actionBtnStyle = { padding: '0.8rem 2.2rem', fontSize: '1.05rem', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', cursor: 'pointer' };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(0, 0, 0, 0.4)', padding: '1.2rem 2.5rem', borderRadius: '16px', gap: '1.5rem', minHeight: '80px' }}>
+    <div className="game-controls" aria-label="Game controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(0, 0, 0, 0.4)', padding: '1.2rem 2.5rem', borderRadius: '16px', gap: '1.5rem', minHeight: '80px' }}>
       {gameState === 'betting' && (
         <>
-          <span>Wager:</span>
-          <input type="number" value={initialBet} onChange={(e) => setInitialBet(Number(e.target.value))} step="25" min="25" style={inputStyle} />
-          <span>Spots:</span>
-          <select value={numHands} onChange={(e) => setNumHands(Number(e.target.value))} style={{ ...inputStyle, width: '70px' }}>
+          <label htmlFor="wager">Wager</label>
+          <input id="wager" aria-label="Wager amount" type="number" value={initialBet} onChange={(e) => setInitialBet(Number(e.target.value))} step="25" min="25" style={inputStyle} />
+          <label htmlFor="spots">Spots</label>
+          <select id="spots" aria-label="Number of spots" value={numHands} onChange={(e) => setNumHands(Number(e.target.value))} style={{ ...inputStyle, width: '70px' }}>
             <option value={1}>1</option>
             <option value={2}>2</option>
           </select>

@@ -21,7 +21,7 @@ export const getDetailedPlay = (pCards, dUpCard, tc) => {
   const isSoft = pCards.length === 2 && pCards.some(c => c.value === 'A') && p <= 21;
 
   // Illustrious 18 Deviations
-  if (p === 16 && d === 10 && tc >= 0) return { action: 'stand', type: 'Deviation (Illustrious 18)', rule: 'Stand on 16 vs 10 at TC ≥ 0.' };
+  if (!isPair && p === 16 && d === 10 && tc >= 0) return { action: 'stand', type: 'Deviation (Illustrious 18)', rule: 'Stand on 16 vs 10 at TC ≥ 0.' };
   if (p === 15 && d === 10 && tc >= 4) return { action: 'stand', type: 'Deviation (Illustrious 18)', rule: 'Stand on 15 vs 10 at TC ≥ +4.' };
   if (p === 11 && d === 11 && tc >= 1) return { action: 'double', type: 'Deviation (Illustrious 18)', rule: 'Double 11 vs Ace at TC ≥ +1.' };
   if (p === 10 && d === 10 && tc >= 4) return { action: 'double', type: 'Deviation (Illustrious 18)', rule: 'Double 10 vs 10 at TC ≥ +4.' };
