@@ -14,6 +14,23 @@ export const calculateTotal = (cards) => {
   return sum;
 };
 
+export const isSoftHand = (cards) => {
+  if (!cards || !Array.isArray(cards)) return false;
+  let hardTotal = 0;
+  let aces = 0;
+  cards.forEach((card) => {
+    if (card.value === 'A') {
+      hardTotal += 1;
+      aces += 1;
+    } else if (['J', 'Q', 'K'].includes(card.value)) {
+      hardTotal += 10;
+    } else {
+      hardTotal += Number(card.numericValue ?? card.value) || 0;
+    }
+  });
+  return aces > 0 && hardTotal + 10 <= 21;
+};
+
 const getNumericValue = (card) => (
   card.numericValue !== undefined
     ? card.numericValue
@@ -30,7 +47,7 @@ export const getDetailedPlay = (
   const d = dValue === 11 ? 11 : dValue;
   const p = calculateTotal(pCards);
   const isPair = pCards.length === 2 && getNumericValue(pCards[0]) === getNumericValue(pCards[1]);
-  const isSoft = pCards.length === 2 && pCards.some(c => c.value === 'A') && p <= 21;
+  const isSoft = isSoftHand(pCards);
   const isPairOfEights = isPair && getNumericValue(pCards[0]) === 8;
   const isPairOfTens = isPair && getNumericValue(pCards[0]) === 10;
   const zeroIndexCount = Number.isFinite(runningCount) ? runningCount : tc;

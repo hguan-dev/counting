@@ -1,4 +1,4 @@
-import { calculateTotal, getDetailedPlay } from './utils/strategyEngine';
+import { calculateTotal, getDetailedPlay, isSoftHand } from './utils/strategyEngine';
 import { Card } from './models/Card';
 import { Shoe } from './models/Shoe';
 import { describe, expect, test } from 'vitest';
@@ -18,6 +18,19 @@ describe('Blackjack Engine Logic & Strategy Tests', () => {
   test('calculateTotal adjusts multiple aces when busting', () => {
     const cards = [new Card('♥', 'A'), new Card('♠', 'A'), new Card('♦', '9')];
     expect(calculateTotal(cards)).toBe(21);
+  });
+
+  test('recognizes usable aces in multi-card soft hands', () => {
+    expect(isSoftHand([
+      new Card('♥', 'A'),
+      new Card('♠', '4'),
+      new Card('♦', '2'),
+    ])).toBe(true);
+    expect(isSoftHand([
+      new Card('♥', 'A'),
+      new Card('♠', '6'),
+      new Card('♦', '10'),
+    ])).toBe(false);
   });
 
   test('calculateTotal safely handles empty and plain card objects', () => {
@@ -86,6 +99,28 @@ describe('Blackjack Engine Logic & Strategy Tests', () => {
     expect(getDetailedPlay(hand, new Card('♦', '5'), 0).action).toBe('double');
     expect(getDetailedPlay(hand, new Card('♦', '8'), 0).action).toBe('stand');
     expect(getDetailedPlay(hand, new Card('♦', '10'), 0).action).toBe('hit');
+  });
+
+  test('Strategy engine: hits three-card soft 17 against a ten-value upcard', () => {
+    const playerHand = [
+      new Card('♥', 'A'),
+      new Card('♠', '4'),
+      new Card('♦', '2'),
+    ];
+    const dealerKing = new Card('♣', 'K');
+    const evaluation = getDetailedPlay(playerHand, dealerKing, 2);
+
+    expect(evaluation.action).toBe('hit');
+    expect(evaluation.rule).toBe('Double soft 17 vs 3-6, otherwise hit.');
+  });
+
+  test('Strategy engine: treats a multi-card ace as hard once it is no longer usable', () => {
+    const playerHand = [
+      new Card('♥', 'A'),
+      new Card('♠', '6'),
+      new Card('♦', '10'),
+    ];
+    expect(getDetailedPlay(playerHand, new Card('♣', 'K'), 2).action).toBe('stand');
   });
 
 });
