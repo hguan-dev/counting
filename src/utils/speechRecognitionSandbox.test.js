@@ -28,6 +28,8 @@ const COMMAND_CASES = [
   ['running it', { type: 'runIt' }],
   ['reddit', { type: 'runIt' }],
   ['again', { type: 'runIt' }],
+  ['start', { type: 'runIt' }],
+  ['go', { type: 'runIt' }],
   ['stack it', { type: 'stackBet' }],
   ['stack it up', { type: 'stackAndRun' }],
   ['bang', { type: 'celebrate' }],

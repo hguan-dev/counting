@@ -94,6 +94,8 @@ describe('table speech', () => {
     expect(parseVoiceCommand('running it')).toEqual({ type: 'runIt' });
     expect(parseVoiceCommand('reddit')).toEqual({ type: 'runIt' });
     expect(parseVoiceCommand('again')).toEqual({ type: 'runIt' });
+    expect(parseVoiceCommand('start')).toEqual({ type: 'runIt' });
+    expect(parseVoiceCommand('go')).toEqual({ type: 'runIt' });
     expect(parseVoiceCommand('stack it')).toEqual({ type: 'stackBet' });
     expect(parseVoiceCommand('stack it up')).toEqual({ type: 'stackAndRun' });
     expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });
@@ -165,6 +167,8 @@ describe('table speech', () => {
     expect(shouldDispatchInterimCommand('stan', parseVoiceCommand('stan'))).toBe(true);
     expect(shouldDispatchInterimCommand('run it', parseVoiceCommand('run it'))).toBe(true);
     expect(shouldDispatchInterimCommand('reddit', parseVoiceCommand('reddit'))).toBe(true);
+    expect(shouldDispatchInterimCommand('start', parseVoiceCommand('start'))).toBe(true);
+    expect(shouldDispatchInterimCommand('go', parseVoiceCommand('go'))).toBe(true);
     expect(shouldDispatchInterimCommand('sorry', parseVoiceCommand('sorry'))).toBe(true);
     expect(shouldDispatchInterimCommand('go back', parseVoiceCommand('go back'))).toBe(true);
     expect(shouldDispatchInterimCommand('nah', parseVoiceCommand('nah'))).toBe(true);

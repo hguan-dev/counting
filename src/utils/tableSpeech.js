@@ -192,7 +192,7 @@ export const parseVoiceCommand = (transcript) => {
   if (/\bdouble(?:\s+down)?\b/.test(normalized)) return { type: 'action', action: 'double' };
   if (/\b(?:split|resplit)\b/.test(normalized)) return { type: 'action', action: 'split' };
   if (/\bsurrender\b/.test(normalized)) return { type: 'action', action: 'surrender' };
-  if (/^(?:run(?:ning)?\s+it|reddit|again)$/.test(normalized)) return { type: 'runIt' };
+  if (/^(?:run(?:ning)?\s+it|reddit|again|start|go)$/.test(normalized)) return { type: 'runIt' };
   if (/\bstack\s+it\s+up\b/.test(normalized)) return { type: 'stackAndRun' };
   if (/\bstack\s+it\b/.test(normalized)) return { type: 'stackBet' };
   if (/^(?:next|next\s+round|new\s+round|deal\s+again)$/.test(normalized)) return { type: 'nextRound' };

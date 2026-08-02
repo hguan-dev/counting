@@ -44,8 +44,8 @@ dealer speech.
 
 Useful conversational aliases include:
 
-- `run it`, `running it`, `Reddit`, or `again`: immediately deal the next round at the
-  same wagers.
+- `run it`, `running it`, `Reddit`, `again`, `start`, or `go`: immediately deal the
+  next round at the same wagers.
 - `next`: return to wager selection; `stack it up`: double the previous wager and deal.
 - `good`, `I'm good`, `stay`, or `Stan`: stand.
 - `face up` or `face down`: choose the corresponding double treatment.
