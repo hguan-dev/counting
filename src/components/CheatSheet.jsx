@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { BET_RAMP_GUIDE_ROWS } from '../utils/betSizing';
+import { DEVIATION_GUIDE_GROUPS } from '../utils/deviations';
 
 const strategyRows = [
   ['Hard 17+', 'Stand'],
@@ -7,13 +9,15 @@ const strategyRows = [
   ['Hard 11', 'Double; hit if doubling unavailable'],
   ['Hard 10', 'Double vs 2–9; otherwise hit'],
   ['Hard 9', 'Double vs 3–6; otherwise hit'],
-  ['Soft 19+', 'Stand'],
-  ['Soft 18 (A,7)', 'Double vs 3–6; stand vs 2,7,8; hit vs 9–A'],
+  ['Soft 20+', 'Stand'],
+  ['Soft 19 (A,8)', 'Double vs 6; otherwise stand'],
+  ['Soft 18 (A,7)', 'Double vs 2–6; stand vs 7,8; hit vs 9–A'],
   ['Soft 13–17', 'Double against select 3–6 upcards; otherwise hit'],
 ];
 
 const pairRows = [
-  ['A,A / 8,8', 'Always split'],
+  ['A,A', 'Always split'],
+  ['8,8', 'Always split except surrender vs Ace'],
   ['10,10', 'Never split; stand'],
   ['9,9', 'Split vs 2–6, 8, 9'],
   ['7,7', 'Split vs 2–7'],
@@ -24,32 +28,16 @@ const pairRows = [
 ];
 
 const surrenderRows = [
-  ['Hard 15', 'Surrender vs 10 at TC 0+; vs Ace at TC +1+'],
-  ['Hard 16 (not 8,8)', 'Surrender vs 9, 10, or Ace'],
+  ['Hard 15', 'Surrender vs 10 at RC 0+; vs Ace at TC −1+'],
+  ['Hard 16 (not 8,8)', 'Surrender vs 9, 10, or Ace; use negative-count exceptions below'],
   ['Hard 17', 'Surrender vs Ace'],
   ['8,8', 'Surrender vs Ace; split against other upcards'],
-];
-
-const surrenderDeviationRows = [
-  ['15 vs 10', 'TC 0+'],
-  ['15 vs Ace', 'TC +1+'],
-  ['15 vs 9', 'TC +2+'],
-  ['14 vs 10', 'TC +3+'],
 ];
 
 const countRows = [
   ['2–6', '+1', 'Low cards leaving the shoe favor the player'],
   ['7–9', '0', 'Neutral'],
   ['10–A', '−1', 'High cards leaving the shoe favor the house'],
-];
-
-const betRampRows = [
-  ['0 or lower', '1 unit', '$10'],
-  ['+1', '1 unit', '$10'],
-  ['+2', '2 units', '$20'],
-  ['+3', '4 units', '$40'],
-  ['+4', '6 units', '$60'],
-  ['+5 or higher', '8 units', '$80'],
 ];
 
 function GuideTable({ rows, headings }) {
@@ -131,17 +119,15 @@ export default function CheatSheet({ onClose }) {
               <GuideTable rows={surrenderRows} headings={['Your hand', 'Surrender when']} />
             </section>
 
-            <details>
-              <summary>Key count deviations in this trainer</summary>
-              <ul className="guide-list">
-                <li><strong>Insurance:</strong> take at true count +3 or higher.</li>
-                <li><strong>16 vs 10:</strong> stand at true count 0 or higher, except always split 8s.</li>
-                <li><strong>15 vs 10:</strong> stand at true count +4 or higher.</li>
-                <li><strong>10 vs 10:</strong> double at true count +4 or higher.</li>
-                <li><strong>11 vs Ace:</strong> double at true count +1 or higher.</li>
-              </ul>
-              <h4>Fabulous 4 surrender indices</h4>
-              <GuideTable rows={surrenderDeviationRows} headings={['Matchup', 'Surrender at']} />
+            <details open>
+              <summary>Complete Hi-Lo deviation index</summary>
+              <p className="section-intro">Six-deck H17, DAS, late surrender. RC means running count; all other indices use the rounded true count.</p>
+              {DEVIATION_GUIDE_GROUPS.map(group => (
+                <div className="deviation-group" key={group.title}>
+                  <h4>{group.title}</h4>
+                  <GuideTable rows={group.rows} headings={['Matchup', 'Deviation']} />
+                </div>
+              ))}
             </details>
           </>
         )}
@@ -246,11 +232,11 @@ export default function CheatSheet({ onClose }) {
 
             <section>
               <h3>Bet sizing: a practice ramp</h3>
-              <p className="section-intro">Choose one fixed unit before the shoe. A 1–8 spread means your largest wager is eight times your minimum—not eight times your last bet.</p>
-              <GuideTable rows={betRampRows} headings={['True count', 'Bet', '$10 unit example']} />
+              <p className="section-intro">This trainer uses a fixed $25 unit and warns before the deal when the wager does not match the count.</p>
+              <GuideTable rows={BET_RAMP_GUIDE_ROWS} headings={['True count', 'Bet', 'Units']} />
               <div className="risk-note">
                 <strong>Size from bankroll, not emotion.</strong>
-                <span>With a $1,000 practice bankroll, a $5 unit creates 200 units; a $10 unit creates 100. More units reduce bet size and volatility, but no bankroll eliminates the risk of ruin.</span>
+                <span>A $1,000 practice bankroll contains 40 units at $25 each. This ramp is for training and does not eliminate risk of ruin.</span>
               </div>
             </section>
 

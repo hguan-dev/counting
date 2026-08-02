@@ -62,14 +62,14 @@ describe('Blackjack Engine Logic & Strategy Tests', () => {
     ).action).toBe('stand');
   });
 
-  test('Strategy engine: applies H17 surrender and Fabulous 4 indices', () => {
+  test('Strategy engine: applies H17 surrender and full surrender indices', () => {
     const ten = new Card('♦', '10');
     const ace = new Card('♦', 'A');
     const nine = new Card('♦', '9');
 
     expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '5')], ten, 0).action).toBe('surrender');
-    expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '5')], ace, 0).action).toBe('hit');
-    expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '5')], ace, 1).action).toBe('surrender');
+    expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '5')], ace, -2).action).toBe('hit');
+    expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '5')], ace, -1).action).toBe('surrender');
     expect(getDetailedPlay([new Card('♥', '8'), new Card('♠', '8')], ace, 0).action).toBe('surrender');
     expect(getDetailedPlay([new Card('♥', '8'), new Card('♠', '8')], nine, 0).action).toBe('split');
     expect(getDetailedPlay([new Card('♥', '10'), new Card('♠', '4')], ten, 3).action).toBe('surrender');

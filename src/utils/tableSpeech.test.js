@@ -51,6 +51,7 @@ describe('table speech', () => {
   test('recognizes hit and stand commands without substring false positives', () => {
     expect(parseVoiceAction('hit me')).toBe('hit');
     expect(parseVoiceAction('I will stand')).toBe('stand');
+    expect(parseVoiceAction('stan')).toBe('stand');
     expect(parseVoiceAction('stay')).toBe('stand');
     expect(parseVoiceAction("I'm good")).toBe('stand');
     expect(parseVoiceAction('good')).toBe('stand');
@@ -90,6 +91,9 @@ describe('table speech', () => {
     expect(parseVoiceCommand('next round')).toEqual({ type: 'nextRound' });
     expect(parseVoiceCommand('next')).toEqual({ type: 'nextRound' });
     expect(parseVoiceCommand('run it')).toEqual({ type: 'runIt' });
+    expect(parseVoiceCommand('running it')).toEqual({ type: 'runIt' });
+    expect(parseVoiceCommand('reddit')).toEqual({ type: 'runIt' });
+    expect(parseVoiceCommand('again')).toEqual({ type: 'runIt' });
     expect(parseVoiceCommand('stack it')).toEqual({ type: 'stackBet' });
     expect(parseVoiceCommand('stack it up')).toEqual({ type: 'stackAndRun' });
     expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });
@@ -104,6 +108,9 @@ describe('table speech', () => {
     expect(parseVoiceCommand('seriously')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('how sick')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('how sick is that')).toEqual({ type: 'sickReaction' });
+    expect(parseVoiceCommand('nah')).toEqual({ type: 'proceed' });
+    expect(parseVoiceCommand('sorry')).toEqual({ type: 'cancel' });
+    expect(parseVoiceCommand('my bad')).toEqual({ type: 'cancel' });
     expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count', enabled: true });
     expect(parseVoiceCommand('count off')).toEqual({ type: 'count', enabled: false });
     expect(parseVoiceCommand('dealer give me a tip')).toEqual({ type: 'tip' });
@@ -154,7 +161,11 @@ describe('table speech', () => {
 
   test('eagerly dispatches complete commands but waits on ambiguous prefixes', () => {
     expect(shouldDispatchInterimCommand('hit', parseVoiceCommand('hit'))).toBe(true);
+    expect(shouldDispatchInterimCommand('stan', parseVoiceCommand('stan'))).toBe(true);
     expect(shouldDispatchInterimCommand('run it', parseVoiceCommand('run it'))).toBe(true);
+    expect(shouldDispatchInterimCommand('reddit', parseVoiceCommand('reddit'))).toBe(true);
+    expect(shouldDispatchInterimCommand('sorry', parseVoiceCommand('sorry'))).toBe(true);
+    expect(shouldDispatchInterimCommand('nah', parseVoiceCommand('nah'))).toBe(true);
     expect(shouldDispatchInterimCommand('face down', parseVoiceCommand('face down'))).toBe(true);
     expect(shouldDispatchInterimCommand('count off', parseVoiceCommand('count off'))).toBe(true);
     expect(shouldDispatchInterimCommand('count', parseVoiceCommand('count'))).toBe(false);

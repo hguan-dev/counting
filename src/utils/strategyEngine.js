@@ -20,15 +20,34 @@ const getNumericValue = (card) => (
     : (['J', 'Q', 'K'].includes(card.value) ? 10 : card.value === 'A' ? 11 : Number(card.value))
 );
 
-export const getDetailedPlay = (pCards, dUpCard, tc, { allowSurrender = true } = {}) => {
+export const getDetailedPlay = (
+  pCards,
+  dUpCard,
+  tc,
+  { allowSurrender = true, runningCount = null } = {},
+) => {
   const dValue = getNumericValue(dUpCard);
   const d = dValue === 11 ? 11 : dValue;
   const p = calculateTotal(pCards);
   const isPair = pCards.length === 2 && getNumericValue(pCards[0]) === getNumericValue(pCards[1]);
   const isSoft = pCards.length === 2 && pCards.some(c => c.value === 'A') && p <= 21;
   const isPairOfEights = isPair && getNumericValue(pCards[0]) === 8;
+  const isPairOfTens = isPair && getNumericValue(pCards[0]) === 10;
+  const zeroIndexCount = Number.isFinite(runningCount) ? runningCount : tc;
 
-  // Six-deck H17 late surrender, including Hi-Lo Fabulous 4 indices.
+  const deviation = getDeviationPlay({
+    allowSurrender,
+    dealer: d,
+    isPair,
+    isPairOfTens,
+    isSoft,
+    total: p,
+    trueCount: tc,
+    zeroIndexCount,
+  });
+  if (deviation) return deviation;
+
+  // Six-deck H17 late surrender after full count-index overrides.
   if (allowSurrender && pCards.length === 2 && !isSoft) {
     if (isPairOfEights && d === 11) {
       return { action: 'surrender', type: 'Basic Strategy', rule: 'Surrender 8s against an Ace in this six-deck H17 game.' };
@@ -39,25 +58,10 @@ export const getDetailedPlay = (pCards, dUpCard, tc, { allowSurrender = true } =
     if (p === 17 && d === 11) {
       return { action: 'surrender', type: 'Basic Strategy', rule: 'Surrender hard 17 against an Ace when the dealer hits soft 17.' };
     }
-    if (p === 15 && d === 10 && tc >= 0) {
-      return { action: 'surrender', type: 'Deviation (Fabulous 4)', rule: 'Surrender 15 vs 10 at TC ≥ 0.' };
-    }
-    if (p === 15 && d === 11 && tc >= 1) {
-      return { action: 'surrender', type: 'Deviation (Fabulous 4)', rule: 'Surrender 15 vs Ace at TC ≥ +1.' };
-    }
-    if (p === 15 && d === 9 && tc >= 2) {
-      return { action: 'surrender', type: 'Deviation (Fabulous 4)', rule: 'Surrender 15 vs 9 at TC ≥ +2.' };
-    }
-    if (p === 14 && d === 10 && tc >= 3) {
-      return { action: 'surrender', type: 'Deviation (Fabulous 4)', rule: 'Surrender 14 vs 10 at TC ≥ +3.' };
+    if (p === 15 && d === 10 && zeroIndexCount >= 0) {
+      return { action: 'surrender', type: 'H17 Surrender Index', rule: 'Surrender hard 15 vs 10 at a running count of 0 or higher.' };
     }
   }
-
-  // Illustrious 18 Deviations
-  if (!isPair && p === 16 && d === 10 && tc >= 0) return { action: 'stand', type: 'Deviation (Illustrious 18)', rule: 'Stand on 16 vs 10 at TC ≥ 0.' };
-  if (p === 15 && d === 10 && tc >= 4) return { action: 'stand', type: 'Deviation (Illustrious 18)', rule: 'Stand on 15 vs 10 at TC ≥ +4.' };
-  if (p === 11 && d === 11 && tc >= 1) return { action: 'double', type: 'Deviation (Illustrious 18)', rule: 'Double 11 vs Ace at TC ≥ +1.' };
-  if (p === 10 && d === 10 && tc >= 4) return { action: 'double', type: 'Deviation (Illustrious 18)', rule: 'Double 10 vs 10 at TC ≥ +4.' };
 
   // Pairs Strategy
   if (isPair) {
@@ -74,8 +78,9 @@ export const getDetailedPlay = (pCards, dUpCard, tc, { allowSurrender = true } =
 
   // Soft Totals Strategy
   if (isSoft) {
-    if (p >= 19) return { action: 'stand', type: 'Basic Strategy', rule: 'Always stand on soft 19+.' };
-    if (p === 18) return { action: (d >= 3 && d <= 6) ? 'double' : (d <= 8 ? 'stand' : 'hit'), type: 'Basic Strategy', rule: 'Double soft 18 vs 3-6, stand on 2,7,8.' };
+    if (p >= 20) return { action: 'stand', type: 'Basic Strategy', rule: 'Always stand on soft 20+.' };
+    if (p === 19) return { action: d === 6 ? 'double' : 'stand', type: 'Basic Strategy', rule: 'Double soft 19 vs 6 in this H17 game; otherwise stand.' };
+    if (p === 18) return { action: (d >= 2 && d <= 6) ? 'double' : (d <= 8 ? 'stand' : 'hit'), type: 'Basic Strategy', rule: 'Double soft 18 vs 2-6, stand on 7-8, and hit vs 9-Ace.' };
     if (p === 17) return { action: (d >= 3 && d <= 6) ? 'double' : 'hit', type: 'Basic Strategy', rule: 'Double soft 17 vs 3-6, otherwise hit.' };
     if (p >= 15) return { action: (d >= 4 && d <= 6) ? 'double' : 'hit', type: 'Basic Strategy', rule: 'Double soft 15/16 vs 4-6.' };
     if (p >= 13) return { action: (d >= 5 && d <= 6) ? 'double' : 'hit', type: 'Basic Strategy', rule: 'Double soft 13/14 vs 5-6.' };
@@ -92,3 +97,4 @@ export const getDetailedPlay = (pCards, dUpCard, tc, { allowSurrender = true } =
 
   return { action: 'hit', type: 'Basic Strategy', rule: 'Hit stiff totals against strong dealer upcards.' };
 };
+import { getDeviationPlay } from './deviations';

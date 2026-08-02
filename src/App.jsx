@@ -18,14 +18,14 @@ import CheatSheet from './components/CheatSheet';
 import PopupModal from './components/PopupModal';
 import GameControls from './components/GameControls';
 import PlayingCard from './components/PlayingCard';
+import SessionChart from './components/SessionChart';
 import useTableVoice from './hooks/useTableVoice';
 import {
-  getDealerFinishCall,
-  getSpokenCard,
   getSpokenCountSummary,
   getSpokenHandTotal,
 } from './utils/tableSpeech';
 import { getKeyboardCommand } from './utils/keyboardShortcuts';
+import { getRecommendedWager, isValidTableWager } from './utils/betSizing';
 
 const getChipColor = (denom) => {
   if (denom >= 1000) return '#f97316';
@@ -86,6 +86,10 @@ export default function App() {
   const [dealerHand, setDealerHand] = useState([]);
   const [showCount, setShowCount] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
+  const [sessionPnl, setSessionPnl] = useState(0);
+  const [sessionHands, setSessionHands] = useState([]);
+  const [strategyDecisions, setStrategyDecisions] = useState(0);
+  const [strategyMistakes, setStrategyMistakes] = useState(0);
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [sickReactionKey, setSickReactionKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -132,17 +136,10 @@ export default function App() {
     const spot = spots[spotIndex];
     const hand = spot?.subHands[handIndex];
     if (!hand) return;
-    const handName = spot.subHands.length > 1
-      ? `Split hand ${handIndex + 1}`
-      : `Player spot ${spotIndex + 1}`;
-    announce(
-      [
-        ...(Array.isArray(lead) ? lead : lead ? [lead] : []),
-        `${handName}.`,
-        `Total ${getSpokenHandTotal(hand.cards)}.`,
-      ],
-      { listenAfter: true },
-    );
+    const calls = Array.isArray(lead) ? lead : lead ? [lead] : [];
+    if (calls.some(call => String(call).toLowerCase().includes('too many'))) {
+      announce('Too many.', { listenAfter: true });
+    }
   };
 
   const addToBankroll = (amountOverride) => {
@@ -175,6 +172,9 @@ export default function App() {
   const logRoundResults = (finalDealerHand, spots, finalInsuranceBets = []) => {
     const dealerTotal = calculateTotal(finalDealerHand);
     const dealerBlackjack = dealerTotal === 21 && finalDealerHand.length === 2;
+    let realizedDelta = 0;
+    const settledHands = [];
+    const closingTrueCount = shoeRef.current.trueCount;
     spots.forEach((spot, spotIndex) => {
       spot.subHands.forEach((hand, handIndex) => {
         let returnAmount = 0;
@@ -185,6 +185,13 @@ export default function App() {
             ? hand.bet * 2.5
             : hand.bet * 2;
         }
+        const insuranceBet = handIndex === spot.subHands.length - 1
+          ? finalInsuranceBets[spotIndex] || 0
+          : 0;
+        const insuranceReturn = insuranceBet > 0 && dealerBlackjack ? insuranceBet * 3 : 0;
+        const handNet = returnAmount - hand.bet + insuranceReturn - insuranceBet;
+        realizedDelta += handNet;
+        settledHands.push({ net: handNet, trueCount: closingTrueCount });
         loggerRef.current.log(
           'ROUND_RESULT',
           `Spot ${spotIndex + 1}, hand ${handIndex + 1}: ${hand.outcome}; player ${calculateTotal(hand.cards)}, dealer ${dealerTotal}.`,
@@ -224,20 +231,60 @@ export default function App() {
         );
       }
     });
+    setSessionPnl(current => current + realizedDelta);
+    setSessionHands(current => {
+      let cumulativePnl = current.at(-1)?.cumulativePnl || 0;
+      const nextHands = settledHands.map((hand, index) => {
+        cumulativePnl += hand.net;
+        return {
+          ...hand,
+          cumulativePnl,
+          handNumber: current.length + index + 1,
+        };
+      });
+      return [...current, ...nextHands];
+    });
   };
 
-  const deal = async (betsOverride = null) => {
+  const deal = async (betsOverride = null, { skipBetWarning = false } = {}) => {
     const activeBets = Array.isArray(betsOverride)
       ? betsOverride.slice(0, numHands)
       : spotBets.slice(0, numHands);
     const totalWager = activeBets.reduce((sum, bet) => sum + bet, 0);
-    if (activeBets.some(bet => !Number.isFinite(bet) || bet < 5)) {
-      announce('Each spot needs a wager of at least 5 dollars.', { listenAfter: true });
+    if (activeBets.some(bet => !isValidTableWager(bet))) {
+      announce('Each spot needs a wager from 25 to 10000 dollars in 25 dollar units.', { listenAfter: true });
       return;
     }
     if (bankroll < totalWager) {
       announce(`Insufficient funds. The wagers total ${totalWager} dollars and the bankroll is ${bankroll} dollars.`, { listenAfter: true });
       return;
+    }
+
+    const sizingTrueCount = shoeRef.current.needsShuffle() ? 0 : shoeRef.current.trueCount;
+    const recommendedWager = getRecommendedWager(sizingTrueCount);
+    const hasSizingMistake = activeBets.some(bet => bet !== recommendedWager);
+    if (warnStrategy && !skipBetWarning) {
+      if (hasSizingMistake && showStrategyPopups) {
+        setStrategyDecisions(current => current + 1);
+        setStrategyMistakes(current => current + 1);
+        setPendingAction({
+          bets: activeBets,
+          category: 'Bet sizing',
+          intended: 'deal',
+          optimal: `$${recommendedWager} per spot`,
+          recommendedWager,
+          revealHint: true,
+          rule: `At true count ${sizingTrueCount >= 0 ? '+' : ''}${sizingTrueCount}, this trainer's $25-unit ramp calls for $${recommendedWager} on each active spot.`,
+          type: 'betSizing',
+        });
+        announce(
+          `Bet sizing warning. True count ${sizingTrueCount}. Recommended wager ${recommendedWager} dollars per spot.`,
+          { listenAfter: true },
+        );
+        return;
+      }
+      setStrategyDecisions(current => current + 1);
+      if (hasSizingMistake) setStrategyMistakes(current => current + 1);
     }
 
     if (shoeRef.current.needsShuffle()) {
@@ -336,10 +383,6 @@ export default function App() {
       setGameState('resolved');
       logRoundResults([d1, d2], spots);
       playSound(netReturn > 0 ? 'chips' : 'loss');
-      announce(
-        `Dealer has blackjack. ${getRoundOutcomeSummary(spots)}. Round complete.`,
-        { listenAfter: true },
-      );
       return;
     }
 
@@ -366,7 +409,6 @@ export default function App() {
       setGameState('resolved');
       logRoundResults([d1, d2], spots);
       playSound('win');
-      announce(`Dealer ${getSpokenCard(d1)}. Player blackjack. Round complete.`, { listenAfter: true });
     } else {
       findFirstActiveHand(
         spots,
@@ -374,7 +416,6 @@ export default function App() {
         0,
         payoutReturn,
         totalWager,
-        `Dealer ${getSpokenCard(d1)}.`,
       );
     }
   };
@@ -482,10 +523,6 @@ export default function App() {
       setGameState('resolved');
       logRoundResults(dealerHand, spots, nextInsuranceBets);
       playSound(netReturn > 0 ? 'chips' : 'loss');
-      announce(
-        `Dealer has blackjack. ${getRoundOutcomeSummary(spots)}. Round complete.`,
-        { listenAfter: true },
-      );
     } else {
       const spots = JSON.parse(JSON.stringify(spotsOverride));
       let winnings = 0;
@@ -546,13 +583,12 @@ export default function App() {
     if (total > 21) {
       hand.status = 'bust';
       hand.outcome = 'loss';
-      advancePointer(spots, false, 'Too many. Player busts.');
+      advancePointer(spots, false, 'Too many.');
     } else if (total === 21 || hand.isSplitAce) {
       hand.status = 'stood';
-      advancePointer(spots, false, `Total ${getSpokenHandTotal(hand.cards)}.`);
+      advancePointer(spots);
     } else {
       setPlayerSpots(spots);
-      announce(`Total ${getSpokenHandTotal(hand.cards)}.`, { listenAfter: true });
     }
   };
 
@@ -572,7 +608,7 @@ export default function App() {
         wager: hand.bet,
       },
     );
-    advancePointer(spots, false, `Player stands on ${getSpokenHandTotal(hand.cards)}.`);
+    advancePointer(spots);
   };
 
   const executeSurrender = () => {
@@ -648,8 +684,8 @@ export default function App() {
       spots,
       false,
       faceDown
-        ? 'Player doubles. Card face down.'
-        : total > 21 ? 'Too many. Player busts.' : `Total ${getSpokenHandTotal(hand.cards)}.`,
+        ? ''
+        : total > 21 ? 'Too many.' : '',
     );
   };
 
@@ -759,11 +795,9 @@ export default function App() {
       setPlayerSpots(revealedSpots);
       playSound('card');
       await new Promise(r => setTimeout(r, 950));
-      await announce(faceDownDoubles.map(({ hand }) => (
-        calculateTotal(hand.cards) > 21
-          ? 'Too many. Player busts.'
-          : `Total ${getSpokenHandTotal(hand.cards)}.`
-      )));
+      if (faceDownDoubles.some(({ hand }) => calculateTotal(hand.cards) > 21)) {
+        await announce('Too many.');
+      }
     }
 
     resolveRound(dHand, revealedSpots, insBets, presetWinnings, totalWager);
@@ -814,18 +848,7 @@ export default function App() {
     setGameState('resolved');
     const outcomes = spots.flatMap(spot => spot.subHands.map(hand => hand.outcome));
     playSound(outcomes.includes('win') ? 'win' : outcomes.every(outcome => outcome === 'loss') ? 'loss' : 'chips');
-    const outcomeSummary = spots.flatMap((spot, spotIndex) => (
-      spot.subHands.map((hand, handIndex) => {
-        const handName = spot.subHands.length > 1
-          ? `spot ${spotIndex + 1}, split hand ${handIndex + 1}`
-          : `spot ${spotIndex + 1}`;
-        return `${handName} ${hand.outcome}`;
-      })
-    )).join('. ');
-    announce(
-      `${getDealerFinishCall(dHand)} ${outcomeSummary}. Round complete.`,
-      { listenAfter: true },
-    );
+    if (dTotal > 21) announce('Too many.', { listenAfter: true });
   };
 
   const executeRequestedAction = (actionType) => {
@@ -847,7 +870,10 @@ export default function App() {
       curHand.cards,
       dealerHand[0],
       shoeRef.current.trueCount,
-      { allowSurrender: canSurrenderHand(curHand) },
+      {
+        allowSurrender: canSurrenderHand(curHand),
+        runningCount: shoeRef.current.visibleRunningCount,
+      },
     );
     let optimal = evaluation.action;
     if (optimal === 'double' && curHand.cards.length > 2) optimal = calculateTotal(curHand.cards) >= 18 ? 'stand' : 'hit';
@@ -855,15 +881,24 @@ export default function App() {
     
     if (strategyAction !== optimal) {
       if (!showStrategyPopups) {
+        setStrategyDecisions(current => current + 1);
+        setStrategyMistakes(current => current + 1);
         executeRequestedAction(actionType);
       } else {
-        setPendingAction({ intended: actionType, optimal, type: 'play', category: evaluation.type, rule: evaluation.rule });
-        announce(
-          `${actionType === 'doubleFaceDown' ? 'Face down double' : actionType} is not the recommended play. ${evaluation.type} recommends ${optimal}. Strategy decision pending.`,
-          { listenAfter: true },
-        );
+        setStrategyDecisions(current => current + 1);
+        setStrategyMistakes(current => current + 1);
+        setPendingAction({
+          intended: actionType,
+          optimal,
+          type: 'play',
+          category: evaluation.type,
+          revealHint: false,
+          rule: evaluation.rule,
+        });
+        announce('Are you sure?', { listenAfter: true });
       }
     } else {
+      setStrategyDecisions(current => current + 1);
       executeRequestedAction(actionType);
     }
   };
@@ -873,15 +908,22 @@ export default function App() {
   const resolvePendingAction = (proceed) => {
     const action = pendingAction;
     setPendingAction(null);
+    if (action.type === 'betSizing') {
+      if (proceed) {
+        deal(action.bets, { skipBetWarning: true });
+      } else {
+        setSpotBets(current => current.map((bet, index) => (
+          index < numHands ? action.recommendedWager : bet
+        )));
+        announce(`Wagers corrected to ${action.recommendedWager} dollars per spot.`, { listenAfter: true });
+      }
+      return;
+    }
     if (proceed) {
       executeRequestedAction(action.intended);
     } else {
-      announcePlayerTurn(
-        playerSpots,
-        activeSpotIndex,
-        activeSubHandIndex,
-        `Choose the recommended ${action.optimal}.`,
-      );
+      setHintedAction(action.optimal);
+      executeRequestedAction(action.optimal);
     }
   };
 
@@ -903,7 +945,9 @@ export default function App() {
 
   const getVoiceSummary = () => {
     if (pendingAction) {
-      return `${pendingAction.intended} differs from the recommended ${pendingAction.optimal}. Strategy decision pending.`;
+      return pendingAction.revealHint
+        ? `The recommended choice is ${pendingAction.optimal}.`
+        : 'Are you sure? Strategy decision pending.';
     }
 
     if (gameState === 'betting') {
@@ -911,7 +955,7 @@ export default function App() {
         .slice(0, numHands)
         .map((bet, index) => `spot ${index + 1}, ${bet} dollars`)
         .join('; ');
-      return `Betting is open with ${numHands} ${numHands === 1 ? 'spot' : 'spots'}: ${wagers}.`;
+      return `${numHands} ${numHands === 1 ? 'spot' : 'spots'}: ${wagers}.`;
     }
 
     if (gameState === 'evenMoney') {
@@ -949,10 +993,10 @@ export default function App() {
       : command.bets;
     if (
       bets.length !== spotCount
-      || bets.some(bet => !Number.isFinite(bet) || bet < 5 || bet > 10000)
+      || bets.some(bet => !isValidTableWager(bet))
     ) {
       announce(
-        `Please give one wager for each spot, between 5 and 10000 dollars.`,
+        `Please give one wager for each spot, between 25 and 10000 dollars in 25 dollar units.`,
         { listenAfter: true },
       );
       return;
@@ -966,7 +1010,6 @@ export default function App() {
 
   const beginNextRound = () => {
     setGameState('betting');
-    announce('Betting is open.', { listenAfter: true });
   };
 
   const triggerCelebration = () => {
@@ -1055,13 +1098,18 @@ export default function App() {
         hand.cards,
         dealerHand[0],
         shoeRef.current.trueCount,
-        { allowSurrender: canSurrenderHand(hand) },
+        {
+          allowSurrender: canSurrenderHand(hand),
+          runningCount: shoeRef.current.visibleRunningCount,
+        },
       );
       let recommendedAction = evaluation.action;
       if (recommendedAction === 'double' && hand.cards.length > 2) {
         recommendedAction = calculateTotal(hand.cards) >= 18 ? 'stand' : 'hit';
       }
       setHintedAction(recommendedAction);
+      setStrategyDecisions(current => current + 1);
+      setStrategyMistakes(current => current + 1);
       announce(
         `${evaluation.type} recommends ${recommendedAction}. The recommended button is highlighted. ${evaluation.rule}`,
         { listenAfter: true },
@@ -1288,6 +1336,10 @@ export default function App() {
     );
   };
 
+  const mistakeRate = strategyDecisions > 0
+    ? Math.round((strategyMistakes / strategyDecisions) * 100)
+    : 0;
+
   return (
     <main className="app-shell" style={{
       position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
@@ -1387,11 +1439,16 @@ export default function App() {
 
       <PopupModal 
         isOpen={!!pendingAction}
-        title="Sub-Optimal Play"
+        title={pendingAction?.type === 'betSizing' ? 'Bet sizing check' : 'Are you sure?'}
         category={pendingAction?.category}
         optimalAction={pendingAction?.optimal}
         rule={pendingAction?.rule}
+        revealHint={pendingAction?.revealHint}
         onCorrect={() => resolvePendingAction(false)}
+        onHint={() => {
+          setHintedAction(pendingAction?.optimal);
+          setPendingAction(current => current ? { ...current, revealHint: true } : current);
+        }}
         onProceed={() => resolvePendingAction(true)}
       />
 
@@ -1422,6 +1479,11 @@ export default function App() {
           <span>Bankroll</span>
           <strong>${bankroll.toFixed(2)}</strong>
           <small>+ Reload</small>
+          <span className="session-metrics" aria-label={`Session realized P and L ${sessionPnl} dollars. ${strategyMistakes} mistakes across ${strategyDecisions} decisions, ${mistakeRate} percent.`}>
+            <span><em>P&amp;L</em><b className={sessionPnl >= 0 ? 'is-positive' : 'is-negative'}>{sessionPnl >= 0 ? '+' : '−'}${Math.abs(sessionPnl).toFixed(2)}</b></span>
+            <span><em>Mistakes</em><b>{strategyMistakes} / {strategyDecisions}</b></span>
+            <span><em>Rate</em><b>{mistakeRate}%</b></span>
+          </span>
         </button>
         <div className="header-actions">
           <div className="header-utility-row">
@@ -1561,32 +1623,35 @@ export default function App() {
       )}
 
       {showReload && (
-        <section className="reload-panel" aria-label="Reload bankroll">
-          <div className="reload-copy">
-            <span className="eyebrow">Buy in</span>
-            <strong>Add practice funds</strong>
+        <section className="session-panel" aria-label="Session analytics and bankroll reload">
+          <SessionChart hands={sessionHands} />
+          <div className="reload-panel">
+            <div className="reload-copy">
+              <span className="eyebrow">Buy in</span>
+              <strong>Add practice funds</strong>
+            </div>
+            <div className="reload-presets" aria-label="Reload presets">
+              {[100, 500, 1000].map(amount => (
+                <button key={amount} className={reloadAmount === amount ? 'is-selected' : ''} onClick={() => setReloadAmount(amount)}>
+                  +${amount}
+                </button>
+              ))}
+            </div>
+            <label className="reload-custom" htmlFor="reload-amount">
+              <span>Custom</span>
+              <input
+                id="reload-amount"
+                aria-label="Custom reload amount"
+                type="number"
+                min="1"
+                max="100000"
+                step="100"
+                value={reloadAmount}
+                onChange={event => setReloadAmount(Number(event.target.value))}
+              />
+            </label>
+            <button className="reload-confirm" onClick={() => addToBankroll()}>Add funds</button>
           </div>
-          <div className="reload-presets" aria-label="Reload presets">
-            {[100, 500, 1000].map(amount => (
-              <button key={amount} className={reloadAmount === amount ? 'is-selected' : ''} onClick={() => setReloadAmount(amount)}>
-                +${amount}
-              </button>
-            ))}
-          </div>
-          <label className="reload-custom" htmlFor="reload-amount">
-            <span>Custom</span>
-            <input
-              id="reload-amount"
-              aria-label="Custom reload amount"
-              type="number"
-              min="1"
-              max="100000"
-              step="100"
-              value={reloadAmount}
-              onChange={event => setReloadAmount(Number(event.target.value))}
-            />
-          </label>
-          <button className="reload-confirm" onClick={() => addToBankroll()}>Add funds</button>
         </section>
       )}
 

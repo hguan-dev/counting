@@ -172,6 +172,49 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.bankroll-card .session-metrics {
+  display: grid;
+  width: 100%;
+  margin-top: 0.42rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.session-metrics > span {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.session-metrics em {
+  color: rgba(247, 245, 237, 0.46);
+  font-size: 0.48rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.session-metrics b {
+  color: var(--cream);
+  font-size: 0.61rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.session-metrics b.is-positive {
+  color: #9ee6b7;
+}
+
+.session-metrics b.is-negative {
+  color: #fda4af;
+}
+
 .header-actions {
   display: grid;
   min-width: 0;
@@ -359,17 +402,150 @@ button:disabled {
   animation-delay: -0.4s;
 }
 
-.reload-panel {
-  display: flex;
-  width: min(760px, 100%);
+.session-panel {
+  display: grid;
+  width: min(900px, 100%);
   margin: 0.7rem auto 0;
   padding: 0.72rem;
   border: 1px solid rgba(232, 197, 106, 0.25);
   border-radius: 13px;
   background: linear-gradient(180deg, rgba(11, 54, 35, 0.98), rgba(3, 27, 17, 0.98));
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 0.8rem;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28);
+}
+
+.session-panel .reload-panel {
+  display: flex;
+  margin: 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   align-items: center;
   gap: 0.7rem;
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28);
+}
+
+.session-chart {
+  min-width: 0;
+  margin: 0;
+}
+
+.session-chart figcaption {
+  display: flex;
+  margin-bottom: 0.2rem;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.session-chart figcaption strong {
+  margin-right: auto;
+  color: var(--cream);
+  font-family: Georgia, serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.session-chart figcaption span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.session-chart figcaption i {
+  width: 13px;
+  height: 3px;
+  border-radius: 3px;
+}
+
+.legend-pnl {
+  background: #f4dd9a;
+}
+
+.legend-count {
+  background: #67d7ff;
+}
+
+.session-chart svg {
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  overflow: visible;
+}
+
+.chart-grid,
+.chart-count-zero {
+  stroke-width: 1;
+}
+
+.chart-grid {
+  stroke: rgba(244, 221, 154, 0.28);
+}
+
+.chart-count-zero {
+  stroke: rgba(103, 215, 255, 0.2);
+  stroke-dasharray: 4 5;
+}
+
+.chart-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.chart-line-pnl {
+  stroke: #f4dd9a;
+}
+
+.chart-line-count {
+  stroke: #67d7ff;
+  stroke-dasharray: 6 5;
+  stroke-width: 2;
+}
+
+.chart-point-pnl {
+  fill: #f4dd9a;
+}
+
+.chart-point-count {
+  fill: #67d7ff;
+}
+
+.chart-axis-label,
+.chart-axis-caption {
+  fill: rgba(247, 245, 237, 0.52);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-axis-count {
+  fill: rgba(103, 215, 255, 0.75);
+}
+
+.session-chart-empty {
+  display: flex;
+  min-height: 105px;
+  padding: 1rem;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.session-chart-empty strong {
+  color: var(--cream);
+  font-family: Georgia, serif;
+  font-weight: 500;
+}
+
+.session-chart-empty span {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.68rem;
 }
 
 .reload-copy {
@@ -1514,6 +1690,18 @@ button:disabled {
   cursor: pointer;
 }
 
+.deviation-group {
+  margin-top: 1rem;
+}
+
+.deviation-group h4 {
+  margin: 0;
+  color: var(--gold-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .study-footer {
   padding: 0.75rem 1.5rem;
   border-top: 1px solid var(--line);
@@ -1643,7 +1831,21 @@ button:disabled {
   }
 
   .bankroll-card {
-    min-width: 118px;
+    width: 164px;
+    min-width: 164px;
+    padding-inline: 0.65rem;
+  }
+
+  .bankroll-card .session-metrics {
+    gap: 0.2rem;
+  }
+
+  .session-metrics em {
+    font-size: 0.42rem;
+  }
+
+  .session-metrics b {
+    font-size: 0.55rem;
   }
 
   .header-actions {
@@ -1696,9 +1898,23 @@ button:disabled {
     width: min(340px, calc(100vw - 1.5rem));
   }
 
-  .reload-panel {
+  .session-panel {
+    margin-top: 0;
+    padding: 0.65rem;
+    grid-template-columns: 1fr;
+  }
+
+  .session-panel .reload-panel {
     padding: 0.65rem;
     flex-wrap: wrap;
+  }
+
+  .session-chart figcaption {
+    flex-wrap: wrap;
+  }
+
+  .session-chart figcaption strong {
+    width: 100%;
   }
 
   .reload-copy {
