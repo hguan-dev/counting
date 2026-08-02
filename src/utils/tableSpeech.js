@@ -196,8 +196,8 @@ export const parseVoiceCommand = (transcript) => {
   if (/\bstack\s+it\b/.test(normalized)) return { type: 'stackBet' };
   if (/^(?:next|next\s+round|new\s+round|deal\s+again)$/.test(normalized)) return { type: 'nextRound' };
   if (/\b(?:deal|deal\s+cards|start\s+round)\b/.test(normalized)) return { type: 'deal' };
-  if (/\bbang\b/.test(normalized)) return { type: 'celebrate' };
-  if (/\b(?:bro|fuck|sickening|sick)\b/.test(normalized)) return { type: 'sickReaction' };
+  if (/\bbang\b|\bgood\s+boy\b/.test(normalized)) return { type: 'celebrate' };
+  if (/\b(?:bro|fuck|seriously|sickening|sick)\b|\bare\s+you\s+serious\b/.test(normalized)) return { type: 'sickReaction' };
   if (/\b(?:proceed|do\s+it|play\s+anyway)\b/.test(normalized)) return { type: 'proceed' };
   if (/\b(?:correct\s+play|go\s+back|cancel)\b/.test(normalized)) return { type: 'cancel' };
   if (/\b(?:tip|hint|advice|recommended\s+(?:move|play)|correct\s+move|what\s+should\s+i\s+do|what(?:'s|\s+is)\s+the\s+(?:move|play))\b/.test(normalized)) return { type: 'tip' };
@@ -209,6 +209,8 @@ export const parseVoiceCommand = (transcript) => {
   if (/\b(?:help|voice\s+help|commands)\b/.test(normalized)) return { type: 'help' };
   if (/\b(?:dealer\s+voice|narration)\s+(?:off|mute)\b/.test(normalized)) return { type: 'speech', enabled: false };
   if (/^(?:dealer\s+voice|narration)(?:\s+on)?$/.test(normalized)) return { type: 'speech', enabled: true };
+  if (/^(?:exit|leave)\s+full\s*screen$|^full\s*screen\s+off$/.test(normalized)) return { type: 'fullscreen', enabled: false };
+  if (/^(?:enter\s+)?full\s*screen(?:\s+on)?$/.test(normalized)) return { type: 'fullscreen', enabled: true };
   if (/\b(?:guard|strategy\s+guard)\s+off\b/.test(normalized)) return { type: 'guard', enabled: false };
   if (/\b(?:guard|strategy\s+guard)\s+on\b/.test(normalized)) return { type: 'guard', enabled: true };
   if (/\bpopups?\s+off\b/.test(normalized)) return { type: 'popups', enabled: false };
@@ -251,6 +253,9 @@ export const shouldDispatchInterimCommand = (transcript, command) => {
   }
   if (command.type === 'studyGuide') {
     return command.open === false || /^(?:open|show)\b|\bon$/.test(normalized);
+  }
+  if (command.type === 'fullscreen') {
+    return command.enabled === false || /\bon$/.test(normalized);
   }
   return ['guard', 'popups', 'sound'].includes(command.type);
 };

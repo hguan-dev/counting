@@ -92,10 +92,13 @@ describe('table speech', () => {
     expect(parseVoiceCommand('stack it')).toEqual({ type: 'stackBet' });
     expect(parseVoiceCommand('stack it up')).toEqual({ type: 'stackAndRun' });
     expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });
+    expect(parseVoiceCommand('good boy')).toEqual({ type: 'celebrate' });
     expect(parseVoiceCommand('fuck')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('sickening')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('bro')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('bro are you serious')).toEqual({ type: 'sickReaction' });
+    expect(parseVoiceCommand('are you serious')).toEqual({ type: 'sickReaction' });
+    expect(parseVoiceCommand('seriously')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('how sick')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('how sick is that')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count', enabled: true });
@@ -109,6 +112,9 @@ describe('table speech', () => {
     expect(parseVoiceCommand('open the study guide')).toEqual({ type: 'studyGuide', open: true });
     expect(parseVoiceCommand('study guide')).toEqual({ type: 'studyGuide', open: true });
     expect(parseVoiceCommand('study guide off')).toEqual({ type: 'studyGuide', open: false });
+    expect(parseVoiceCommand('full screen')).toEqual({ type: 'fullscreen', enabled: true });
+    expect(parseVoiceCommand('exit full screen')).toEqual({ type: 'fullscreen', enabled: false });
+    expect(parseVoiceCommand('full screen off')).toEqual({ type: 'fullscreen', enabled: false });
     expect(parseVoiceCommand('microphone test')).toEqual({ type: 'micTest' });
   });
 
@@ -150,6 +156,11 @@ describe('table speech', () => {
     expect(shouldDispatchInterimCommand('count', parseVoiceCommand('count'))).toBe(false);
     expect(shouldDispatchInterimCommand('stack it', parseVoiceCommand('stack it'))).toBe(false);
     expect(shouldDispatchInterimCommand('stack it up', parseVoiceCommand('stack it up'))).toBe(true);
+    expect(shouldDispatchInterimCommand('full screen', parseVoiceCommand('full screen'))).toBe(false);
+    expect(shouldDispatchInterimCommand(
+      'exit full screen',
+      parseVoiceCommand('exit full screen'),
+    )).toBe(true);
     expect(shouldDispatchInterimCommand(
       'two spots bet twenty',
       parseVoiceCommand('two spots bet twenty'),

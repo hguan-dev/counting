@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Shoe } from './models/Shoe';
 import { calculateTotal, getDetailedPlay } from './utils/strategyEngine';
 import {
@@ -45,12 +45,13 @@ const isSoft17 = (cards) => {
   return hardSum === 7 && aces > 0;
 };
 
-const CONFETTI_PARTICLES = Array.from({ length: 320 }, (_, index) => ({
+const CONFETTI_PARTICLES = Array.from({ length: 720 }, (_, index) => ({
   color: ['#facc15', '#fb7185', '#38bdf8', '#4ade80', '#c084fc', '#f97316'][index % 6],
-  delay: `${(index % 28) * 40}ms`,
-  drift: `${((index * 47) % 420) - 210}px`,
+  delay: `${(index % 40) * 34}ms`,
+  drift: `${((index * 47) % 560) - 280}px`,
   left: `${1 + ((index * 37) % 98)}%`,
   rotation: `${360 + ((index * 83) % 1080)}deg`,
+  reverseRotation: `${-360 - ((index * 83) % 1080)}deg`,
   scale: 0.7 + (index % 7) * 0.1,
 }));
 
@@ -85,6 +86,7 @@ export default function App() {
   const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [sickReactionKey, setSickReactionKey] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [insuranceBets, setInsuranceBets] = useState([]);
   const [evenMoneyQueue, setEvenMoneyQueue] = useState([]);
   
@@ -115,6 +117,13 @@ export default function App() {
     isListeningAllowed: !['dealerRevealing', 'shuffling'].includes(gameState),
     onCommand: command => voiceCommandRef.current?.(command),
   });
+
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    syncFullscreen();
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, []);
 
   const announcePlayerTurn = (spots, spotIndex, handIndex, lead = '') => {
     const spot = spots[spotIndex];
@@ -931,6 +940,20 @@ export default function App() {
     playSound('loss');
   };
 
+  const toggleFullscreen = async (enabled = !isFullscreen) => {
+    try {
+      if (enabled && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else if (!enabled && document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      announce('Fullscreen was blocked by the browser. Use the fullscreen button to try again.', {
+        listenAfter: true,
+      });
+    }
+  };
+
   const stackBets = (dealImmediately = false) => {
     if (!['betting', 'resolved'].includes(gameState)) {
       announce('Stack it is available between rounds.', { listenAfter: true });
@@ -1056,6 +1079,10 @@ export default function App() {
     }
     if (command.type === 'sickReaction') {
       triggerSickReaction();
+      return;
+    }
+    if (command.type === 'fullscreen') {
+      toggleFullscreen(command.enabled);
       return;
     }
     if (command.type === 'stackBet') {
@@ -1207,6 +1234,18 @@ export default function App() {
           72% { opacity: 1; }
           100% { opacity: 0; transform: translate3d(var(--confetti-drift), 112vh, 0) rotate(var(--confetti-rotation)) scale(var(--particle-scale)); }
         }
+        @keyframes confettiCannonLeft {
+          0% { opacity: 0; transform: translate3d(-10vw, 26vh, 0) rotate(0deg) scale(0.45); }
+          7% { opacity: 1; }
+          70% { opacity: 1; }
+          100% { opacity: 0; transform: translate3d(112vw, var(--confetti-drift), 0) rotate(var(--confetti-rotation)) scale(var(--particle-scale)); }
+        }
+        @keyframes confettiCannonRight {
+          0% { opacity: 0; transform: translate3d(10vw, 34vh, 0) rotate(0deg) scale(0.45); }
+          7% { opacity: 1; }
+          70% { opacity: 1; }
+          100% { opacity: 0; transform: translate3d(-112vw, var(--confetti-drift), 0) rotate(var(--confetti-reverse-rotation)) scale(var(--particle-scale)); }
+        }
         @keyframes sickReactionFall {
           0% { opacity: 0; transform: translate3d(0, -18vh, 0) rotate(-20deg) scale(0.45); }
           8% { opacity: 1; }
@@ -1239,6 +1278,7 @@ export default function App() {
               key={index}
               style={{
                 '--confetti-drift': particle.drift,
+                '--confetti-reverse-rotation': particle.reverseRotation,
                 '--confetti-rotation': particle.rotation,
                 '--particle-scale': particle.scale,
                 animationDelay: particle.delay,
@@ -1312,6 +1352,13 @@ export default function App() {
           <button className="topbar-button" onClick={() => setShowCount(!showCount)}>{showCount ? "Hide Count" : "Peek Count"}</button>
           <button className={`topbar-button ${soundEnabled ? 'is-on' : ''}`} onClick={() => setSoundEnabled(current => !current)}>{soundEnabled ? 'Sound on' : 'Sound off'}</button>
           <button className={`topbar-button ${speechEnabled ? 'is-on' : ''}`} onClick={() => setSpeechEnabled(current => !current)}>{speechEnabled ? 'Dealer voice on' : 'Dealer voice off'}</button>
+          <button
+            className={`topbar-button ${isFullscreen ? 'is-on' : ''}`}
+            onClick={() => toggleFullscreen()}
+            aria-pressed={isFullscreen}
+          >
+            {isFullscreen ? 'Exit full screen' : 'Full screen'}
+          </button>
           {kokoroVoices.length > 0 && (
             <label className="voice-picker">
               <span>

@@ -27,10 +27,13 @@ const COMMAND_CASES = [
   ['stack it', { type: 'stackBet' }],
   ['stack it up', { type: 'stackAndRun' }],
   ['bang', { type: 'celebrate' }],
+  ['good boy', { type: 'celebrate' }],
   ['fuck', { type: 'sickReaction' }],
   ['sickening', { type: 'sickReaction' }],
   ['bro', { type: 'sickReaction' }],
   ['bro are you serious', { type: 'sickReaction' }],
+  ['are you serious', { type: 'sickReaction' }],
+  ['seriously', { type: 'sickReaction' }],
   ['how sick', { type: 'sickReaction' }],
   ['how sick is that', { type: 'sickReaction' }],
   ['two spots bet twenty five and fifty', {
@@ -48,6 +51,8 @@ const COMMAND_CASES = [
   ['dealer voice off', { type: 'speech', enabled: false }],
   ['open the study guide', { type: 'studyGuide', open: true }],
   ['study guide off', { type: 'studyGuide', open: false }],
+  ['full screen', { type: 'fullscreen', enabled: true }],
+  ['exit full screen', { type: 'fullscreen', enabled: false }],
 ];
 
 const recognitionEvent = (transcripts, isFinal = true) => {
