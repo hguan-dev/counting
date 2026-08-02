@@ -29,6 +29,9 @@ const COMMAND_CASES = [
   ['bang', { type: 'celebrate' }],
   ['fuck', { type: 'sickReaction' }],
   ['sickening', { type: 'sickReaction' }],
+  ['bro', { type: 'sickReaction' }],
+  ['bro are you serious', { type: 'sickReaction' }],
+  ['how sick', { type: 'sickReaction' }],
   ['how sick is that', { type: 'sickReaction' }],
   ['two spots bet twenty five and fifty', {
     type: 'configureBets',

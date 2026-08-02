@@ -94,6 +94,9 @@ describe('table speech', () => {
     expect(parseVoiceCommand('bang')).toEqual({ type: 'celebrate' });
     expect(parseVoiceCommand('fuck')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('sickening')).toEqual({ type: 'sickReaction' });
+    expect(parseVoiceCommand('bro')).toEqual({ type: 'sickReaction' });
+    expect(parseVoiceCommand('bro are you serious')).toEqual({ type: 'sickReaction' });
+    expect(parseVoiceCommand('how sick')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('how sick is that')).toEqual({ type: 'sickReaction' });
     expect(parseVoiceCommand('what is the true count')).toEqual({ type: 'count', enabled: true });
     expect(parseVoiceCommand('count off')).toEqual({ type: 'count', enabled: false });

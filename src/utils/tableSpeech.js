@@ -197,7 +197,7 @@ export const parseVoiceCommand = (transcript) => {
   if (/^(?:next|next\s+round|new\s+round|deal\s+again)$/.test(normalized)) return { type: 'nextRound' };
   if (/\b(?:deal|deal\s+cards|start\s+round)\b/.test(normalized)) return { type: 'deal' };
   if (/\bbang\b/.test(normalized)) return { type: 'celebrate' };
-  if (/\b(?:fuck|sickening|sick)\b/.test(normalized)) return { type: 'sickReaction' };
+  if (/\b(?:bro|fuck|sickening|sick)\b/.test(normalized)) return { type: 'sickReaction' };
   if (/\b(?:proceed|do\s+it|play\s+anyway)\b/.test(normalized)) return { type: 'proceed' };
   if (/\b(?:correct\s+play|go\s+back|cancel)\b/.test(normalized)) return { type: 'cancel' };
   if (/\b(?:tip|hint|advice|recommended\s+(?:move|play)|correct\s+move|what\s+should\s+i\s+do|what(?:'s|\s+is)\s+the\s+(?:move|play))\b/.test(normalized)) return { type: 'tip' };
