@@ -11,6 +11,7 @@ import { GameLogger } from './utils/logger';
 import CheatSheet from './components/CheatSheet';
 import PopupModal from './components/PopupModal';
 import GameControls from './components/GameControls';
+import PlayingCard from './components/PlayingCard';
 
 const getChipColor = (denom) => {
   if (denom >= 500) return '#a29bfe';
@@ -477,8 +478,6 @@ export default function App() {
     );
   };
 
-  const getCardColor = (suit) => (suit === '♥' || suit === '♦') ? '#e74c3c' : '#111';
-
   return (
     <main className="app-shell" style={{
       position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
@@ -521,93 +520,105 @@ export default function App() {
       />
 
       {/* HEADER BAR */}
-      <div className="header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1.2rem' }}>
-        <div style={{ display: 'flex', gap: '3rem', alignItems: 'baseline' }}>
-          <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '400', color: '#f1c40f' }}>BLACKJACK</h1>
-          <div style={{ display: 'flex', gap: '2rem', fontSize: '1.1rem' }}>
-            <div><span style={{ opacity: 0.6 }}>Stack: </span><strong>${bankroll.toFixed(2)}</strong></div>
+      <div className="header-bar">
+        <div className="brand-lockup">
+          <span className="eyebrow">Count lab</span>
+          <div className="brand-line">
+            <h1>BLACKJACK</h1>
+            <span className="table-rules">6 Decks · H17 · Blackjack 3:2</span>
           </div>
         </div>
+        <div className="bankroll-card" aria-label={`Bankroll $${bankroll.toFixed(2)}`}>
+          <span>Bankroll</span>
+          <strong>${bankroll.toFixed(2)}</strong>
+        </div>
         <div className="header-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
+          <label className="toggle-label">
             <input type="checkbox" checked={warnStrategy} onChange={() => setWarnStrategy(!warnStrategy)} style={{ accentColor: '#2ecc71' }} /> Guard
           </label>
-          <label style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
+          <label className="toggle-label">
             <input type="checkbox" checked={showStrategyPopups} onChange={() => setShowStrategyPopups(!showStrategyPopups)} style={{ accentColor: '#3498db' }} /> Popups
           </label>
-          <button onClick={() => setShowCheatSheet(true)} style={headerBtnStyle}>Study Guide</button>
-          <button onClick={() => setShowCount(!showCount)} style={headerBtnStyle}>{showCount ? "Hide Count" : "Peek Count"}</button>
-          <button onClick={() => loggerRef.current.downloadCSV()} style={{ ...headerBtnStyle, background: '#3498db', color: '#fff' }}>Export CSV</button>
+          <button className="topbar-button is-featured" onClick={() => setShowCheatSheet(true)}>Study Guide</button>
+          <button className="topbar-button" onClick={() => setShowCount(!showCount)}>{showCount ? "Hide Count" : "Peek Count"}</button>
+          <button className="topbar-button" onClick={() => loggerRef.current.downloadCSV()}>Export</button>
         </div>
       </div>
 
       {showCount && (
-        <div style={{ background: 'rgba(0,0,0,0.5)', padding: '0.8rem 2rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-around', maxWidth: '500px', margin: '0 auto' }}>
-          <span><strong>RC:</strong> {shoeRef.current.visibleRunningCount}</span>
-          <span style={{ color: '#2ecc71' }}><strong>TC:</strong> {shoeRef.current.trueCount}</span>
+        <div className="count-panel" aria-live="polite">
+          <div><span>Running count</span><strong>{shoeRef.current.visibleRunningCount > 0 ? '+' : ''}{shoeRef.current.visibleRunningCount}</strong></div>
+          <div><span>True count</span><strong>{shoeRef.current.trueCount > 0 ? '+' : ''}{shoeRef.current.trueCount}</strong></div>
+          <div><span>Decks left</span><strong>{Math.max(1, shoeRef.current.cards.length / 52).toFixed(1)}</strong></div>
         </div>
       )}
 
       {/* GAME BOARD TABLE */}
-      <div className="game-board" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1, gap: '3rem' }}>
+      <div className="game-board">
+        <div className="table-arc" aria-hidden="true">
+          <span>INSURANCE PAYS 2 TO 1</span>
+          <strong>BLACKJACK PAYS 3 TO 2</strong>
+          <span>DEALER MUST DRAW TO 16 AND HIT SOFT 17</span>
+        </div>
         {gameState === 'shuffling' ? (
-          <div style={{ color: '#f1c40f', fontSize: '2rem' }}>RESHUFFLING SHOE...</div>
+          <div className="shuffle-state"><span>♠</span> Reshuffling shoe…</div>
         ) : (
           <>
             {/* DEALER AREA */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: '0.8rem' }}>
-                Dealer {gameState === 'playing' || gameState === 'insurance' || gameState === 'evenMoney' ? 'Showing' : dealerHand.length > 0 ? `(Total: ${calculateTotal(dealerHand)})` : ''}
+            <div className="hand-zone dealer-zone">
+              <div className="zone-label">
+                <span>Dealer</span>
+                <strong>
+                  {gameState === 'playing' || gameState === 'insurance' || gameState === 'evenMoney'
+                    ? dealerHand.length ? calculateTotal([dealerHand[0]]) : '—'
+                    : dealerHand.length > 0 ? calculateTotal(dealerHand) : '—'}
+                </strong>
               </div>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', minHeight: '110px' }}>
+              <div className="card-row dealer-cards">
                 {gameState === 'betting' ? (
-                   <div style={{ width: '80px', height: '110px', border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.3 }}>SHOE</div>
+                  <div className="shoe-placeholder">
+                    <span>♠</span>
+                    <small>SHOE READY</small>
+                  </div>
                 ) : (
                   dealerHand.map((card, i) => {
                     const hidden = (gameState === 'playing' || gameState === 'insurance' || gameState === 'evenMoney') && i === 1;
-                    return (
-                      <div key={i} className="card-reveal" style={{ 
-                        background: hidden ? 'repeating-linear-gradient(45deg, #111, #111 10px, #222 10px, #222 20px)' : '#fff', 
-                        color: hidden ? 'transparent' : getCardColor(card.suit),
-                        width: '80px', height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', borderRadius: '8px'
-                      }}>{hidden ? '?' : `${card.value}${card.suit}`}</div>
-                    );
+                    return <PlayingCard key={i} card={card} hidden={hidden} delay={i * 90} />;
                   })
                 )}
               </div>
             </div>
 
             {/* PLAYER SPOTS */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: '0.8rem' }}>Your Spots</div>
+            <div className="hand-zone player-zone">
+              <div className="zone-label"><span>Your hands</span><strong>{playerSpots.reduce((sum, spot) => sum + spot.subHands.length, 0) || '—'}</strong></div>
               <div className="player-spots" style={{ display: 'flex', gap: '3rem', justifyContent: 'center', minHeight: '130px' }}>
                 {gameState === 'betting' ? (
-                  <div style={{ border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '10px', padding: '1.5rem 3rem', opacity: '0.3' }}>CONFIGURE WAGER BELOW</div>
+                  <div className="betting-prompt">
+                    <span>PLACE YOUR WAGER</span>
+                    <small>Choose a chip value and number of spots below</small>
+                  </div>
                 ) : (
                   playerSpots.map((spot, sIdx) => (
-                    <div key={sIdx} style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+                    <div key={sIdx} className="spot-group">
                       {spot.subHands.map((hand, hIdx) => {
                         const isActive = sIdx === activeSpotIndex && hIdx === activeSubHandIndex && gameState === 'playing';
                         const isNaturalBJ = isNaturalBlackjack(hand);
                         return (
-                          <div key={hIdx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                            <div style={{ 
-                              border: isActive ? '2px solid #2ecc71' : '1px solid rgba(255,255,255,0.15)', 
-                              padding: '1rem', borderRadius: '12px', background: isActive ? 'rgba(46, 204, 113, 0.08)' : 'rgba(0,0,0,0.25)',
-                              minWidth: '160px'
-                            }}>
-                              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                {hand.cards.map((card, cIdx) => (
-                                  <div key={cIdx} className="card-reveal" style={{ 
-                                    background: '#fff', color: getCardColor(card.suit), 
-                                    width: '55px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' 
-                                  }}>{card.value}{card.suit}</div>
-                                ))}
-                              </div>
-                              <div style={{ marginTop: '0.6rem', textAlign: 'right', fontSize: '0.9rem' }}>
-                                {isNaturalBJ ? <span style={{ color: '#f1c40f' }}>BLACKJACK!</span> : `Total: ${calculateTotal(hand.cards)}`}
-                              </div>
+                          <div key={hIdx} className={`player-hand ${isActive ? 'is-active' : ''} ${hand.outcome ? `is-${hand.outcome}` : ''}`}>
+                            <div className="hand-meta">
+                              <span>{spot.subHands.length > 1 ? `Split hand ${hIdx + 1}` : `Spot ${sIdx + 1}`}</span>
+                              {hand.outcome && <b>{hand.outcome}</b>}
                             </div>
+                            <div className="hand-cards">
+                                {hand.cards.map((card, cIdx) => (
+                                  <PlayingCard key={cIdx} card={card} compact delay={cIdx * 70} />
+                                ))}
+                            </div>
+                            <div className="hand-total">
+                              <span>{isNaturalBJ ? 'Blackjack' : 'Total'}</span>
+                              <strong>{calculateTotal(hand.cards)}</strong>
+                              </div>
                             {renderChipStack(hand.bet, hand.outcome)}
                           </div>
                         );
@@ -623,7 +634,7 @@ export default function App() {
 
       {/* EVEN MONEY CONTROL OVERLAY OR CONTROLS */}
       {evenMoneyOffered ? (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(0, 0, 0, 0.4)', padding: '1.2rem 2.5rem', borderRadius: '16px', gap: '1.5rem' }}>
+        <div className="decision-bar">
           <span style={{ color: '#f1c40f', fontWeight: '500' }}>You have a Blackjack! Dealer shows an Ace. Take Even Money (1:1)?</span>
           <button onClick={() => executeEvenMoney(true)} style={{ ...headerBtnStyle, background: '#f1c40f', color: '#000', fontWeight: '600' }}>Accept Even Money</button>
           <button onClick={() => executeEvenMoney(false)} style={headerBtnStyle}>Decline (Play Out)</button>
