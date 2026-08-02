@@ -246,3 +246,26 @@ export const getRecognitionErrorMessage = (errorCode) => {
   };
   return messages[errorCode] || 'Speech recognition stopped unexpectedly. Try turning hands-free mode off and on.';
 };
+
+export const getRecognitionFailure = (errorCode) => {
+  const isBlocking = [
+    'audio-capture',
+    'language-not-supported',
+    'not-allowed',
+    'service-not-allowed',
+  ].includes(errorCode);
+
+  return {
+    message: getRecognitionErrorMessage(errorCode),
+    restartAllowed: !isBlocking && errorCode !== 'network',
+    status: isBlocking ? 'blocked' : 'error',
+  };
+};
+
+export const configureRecognition = (recognition, language = 'en-US') => {
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 5;
+  recognition.lang = language || 'en-US';
+  return recognition;
+};

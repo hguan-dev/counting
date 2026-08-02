@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   choosePreferredTableVoice,
-  getRecognitionErrorMessage,
+  configureRecognition,
+  getRecognitionFailure,
   getRecognitionResult,
   scoreTableVoice,
 } from '../utils/tableSpeech';
@@ -114,11 +115,10 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const ensureRecognition = () => {
     if (!voiceSupported || recognitionRef.current) return recognitionRef.current;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new Recognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 5;
-    recognition.lang = window.navigator?.language || 'en-US';
+    const recognition = configureRecognition(
+      new Recognition(),
+      window.navigator?.language || 'en-US',
+    );
     recognition.onstart = () => {
       recognitionActiveRef.current = true;
       restartAllowedRef.current = true;
@@ -145,15 +145,10 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       if (event.error === 'aborted' && (speakingRef.current || !voiceInputEnabledRef.current)) {
         return;
       }
-      const isBlocking = [
-        'audio-capture',
-        'language-not-supported',
-        'not-allowed',
-        'service-not-allowed',
-      ].includes(event.error);
-      restartAllowedRef.current = !isBlocking && event.error !== 'network';
-      setVoiceError(getRecognitionErrorMessage(event.error));
-      setVoiceStatus(isBlocking ? 'blocked' : 'error');
+      const failure = getRecognitionFailure(event.error);
+      restartAllowedRef.current = failure.restartAllowed;
+      setVoiceError(failure.message);
+      setVoiceStatus(failure.status);
     };
     recognition.onnomatch = () => {
       setVoiceError('Speech was detected, but no blackjack command matched.');
