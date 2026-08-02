@@ -102,9 +102,12 @@ export default function App() {
     const handName = spot.subHands.length > 1
       ? `Split hand ${handIndex + 1}`
       : `Player spot ${spotIndex + 1}`;
-    const prefix = lead ? `${lead} ` : '';
     announce(
-      `${prefix}${handName} has ${getSpokenHandTotal(hand.cards)}.`,
+      [
+        ...(Array.isArray(lead) ? lead : lead ? [lead] : []),
+        `${handName}.`,
+        `Total ${getSpokenHandTotal(hand.cards)}.`,
+      ],
       { listenAfter: true },
     );
   };
@@ -419,7 +422,10 @@ export default function App() {
     } else {
       setPlayerSpots(spots);
       announce(
-        `Player draws ${getSpokenCard(drawnCard)}. Total ${getSpokenHandTotal(hand.cards)}.`,
+        [
+          `Player draws ${getSpokenCard(drawnCard)}.`,
+          `Total ${getSpokenHandTotal(hand.cards)}.`,
+        ],
         { listenAfter: true },
       );
     }

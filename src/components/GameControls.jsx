@@ -71,10 +71,10 @@ export default function GameControls({
 
       {gameState === 'playing' && (
         <div className="action-cluster">
-          <button className="action-button is-hit" onClick={onHit}><span>Hit</span><small>Take a card</small></button>
-          <button className="action-button is-stand" onClick={onStand}><span>Stand</span><small>Hold total</small></button>
-          {canDouble && <button className="action-button is-double" onClick={onDouble}><span>Double</span><small>One card</small></button>}
-          {canSplit && <button className="action-button is-split" onClick={onSplit}><span>{canResplit ? 'Resplit' : 'Split'}</span><small>Up to 4 hands</small></button>}
+          <button className="action-button is-hit" onClick={onHit}><span>Hit</span></button>
+          <button className="action-button is-stand" onClick={onStand}><span>Stand</span></button>
+          {canDouble && <button className="action-button is-double" onClick={onDouble}><span>Double</span></button>}
+          {canSplit && <button className="action-button is-split" onClick={onSplit}><span>{canResplit ? 'Resplit' : 'Split'}</span></button>}
           <button
             className={`voice-action ${voiceInputEnabled ? 'is-on' : ''} ${['starting', 'listening', 'hearing', 'processing'].includes(voiceStatus) ? 'is-listening' : ''}`}
             onClick={onToggleVoiceInput}

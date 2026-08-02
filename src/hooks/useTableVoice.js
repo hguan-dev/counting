@@ -12,6 +12,7 @@ import {
   speakWithKokoro,
   stopKokoroSpeech,
 } from '../utils/kokoroVoice';
+import { DEALER_CARD_CALLS, HEART_TABLE_PHRASES } from '../utils/heartVoicePhrases';
 
 const SOUND_PATTERNS = {
   card: [[620, 0.035, 0], [420, 0.045, 0.04]],
@@ -21,22 +22,6 @@ const SOUND_PATTERNS = {
   stand: [[360, 0.08, 0]],
   win: [[520, 0.07, 0], [660, 0.07, 0.08], [820, 0.12, 0.16]],
 };
-
-const DEALER_CARD_CALLS = [
-  'ace.',
-  '2.',
-  '3.',
-  '4.',
-  '5.',
-  '6.',
-  '7.',
-  '8.',
-  '9.',
-  '10.',
-  'jack.',
-  'queen.',
-  'king.',
-];
 
 export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -67,6 +52,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const speakingRef = useRef(false);
   const selectedVoiceNameRef = useRef(selectedVoiceName);
   const voiceModelStatusRef = useRef(voiceModelStatus);
+  const voicePreloadingRef = useRef(false);
   const announcementIdRef = useRef(0);
   const recognitionActiveRef = useRef(false);
   const restartTimerRef = useRef(null);
@@ -230,7 +216,9 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     if (typeof window === 'undefined') return;
     const announcementId = ++announcementIdRef.current;
     const usesKokoro = speechEnabled && selectedVoiceNameRef.current.startsWith('kokoro:');
-    setLastAnnouncement(text);
+    const speechParts = (Array.isArray(text) ? text : [text]).filter(Boolean);
+    const fullText = speechParts.join(' ');
+    setLastAnnouncement(fullText);
     if (recognitionRef.current && !usesKokoro) stopListening();
     speakingRef.current = !usesKokoro;
     stopKokoroSpeech();
@@ -267,7 +255,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
         beginListening();
         return;
       }
-      const utterance = new window.SpeechSynthesisUtterance(text);
+      const utterance = new window.SpeechSynthesisUtterance(fullText);
       const voice = availableVoices.find(item => item.name === selectedVoiceNameRef.current)
         || choosePreferredTableVoice(availableVoices);
       if (voice) utterance.voice = voice;
@@ -282,7 +270,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     if (selectedVoiceNameRef.current.startsWith('kokoro:')) {
       if (voiceModelStatusRef.current !== 'ready') setVoiceModelStatus('loading');
       const kokoroSpeech = speakWithKokoro(
-        text,
+        speechParts,
         selectedVoiceNameRef.current.replace('kokoro:', ''),
         progress => {
           if (progress?.status === 'progress') {
@@ -298,8 +286,10 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       );
       kokoroSpeech
         .then(() => {
-          setVoiceModelStatus('ready');
-          setVoiceModelProgress(100);
+          if (!voicePreloadingRef.current) {
+            setVoiceModelStatus('ready');
+            setVoiceModelProgress(100);
+          }
           beginListening();
         })
         .catch(() => {
@@ -339,11 +329,12 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   useEffect(() => {
     if (!speechEnabled || !selectedVoiceName.startsWith('kokoro:')) return undefined;
     let cancelled = false;
+    voicePreloadingRef.current = true;
     setVoiceModelStatus('loading');
     setVoiceModelProgress(0);
     preloadKokoroVoice(
       selectedVoiceName.replace('kokoro:', ''),
-      DEALER_CARD_CALLS,
+      selectedVoiceName === 'kokoro:af_heart' ? HEART_TABLE_PHRASES : DEALER_CARD_CALLS,
       progress => {
         if (cancelled) return;
         if (progress?.status === 'progress') {
@@ -355,15 +346,20 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
     )
       .then(() => {
         if (!cancelled) {
+          voicePreloadingRef.current = false;
           setVoiceModelStatus('ready');
           setVoiceModelProgress(100);
         }
       })
       .catch(() => {
-        if (!cancelled) setVoiceModelStatus('warming');
+        if (!cancelled) {
+          voicePreloadingRef.current = false;
+          setVoiceModelStatus('warming');
+        }
       });
     return () => {
       cancelled = true;
+      voicePreloadingRef.current = false;
     };
   }, [selectedVoiceName, speechEnabled]);
 

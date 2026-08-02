@@ -1,3 +1,5 @@
+import { HEART_TABLE_PHRASES } from './heartVoicePhrases';
+
 export const KOKORO_VOICES = [
   { id: 'af_heart', label: 'Heart · American · A grade' },
   { id: 'af_bella', label: 'Bella · American · A− grade' },
@@ -14,6 +16,9 @@ let speechRun = 0;
 let workerRequestId = 0;
 const workerRequests = new Map();
 const audioBlobPromises = new Map();
+const heartAssetIndex = new Map(
+  HEART_TABLE_PHRASES.map((phrase, index) => [phrase, String(index).padStart(3, '0')]),
+);
 
 const cleanUpAudio = () => {
   activeResolve?.();
@@ -74,8 +79,16 @@ export const preloadKokoro = (onProgress) => getModel(onProgress);
 const getAudioBlob = (text, voice) => {
   const cacheKey = `${voice}:${text}`;
   if (!audioBlobPromises.has(cacheKey)) {
-    const audioPromise = requestWorker('generate', { text, voice })
-      .then(result => new Blob([result.buffer], { type: result.mimeType }))
+    const heartAsset = voice === 'af_heart' ? heartAssetIndex.get(text) : null;
+    const audioRequest = heartAsset
+      ? fetch(`${import.meta.env.BASE_URL}audio/heart/${heartAsset}.mp3`)
+        .then(response => {
+          if (!response.ok) throw new Error(`Heart audio asset ${heartAsset} is unavailable.`);
+          return response.blob();
+        })
+      : requestWorker('generate', { text, voice })
+        .then(result => new Blob([result.buffer], { type: result.mimeType }));
+    const audioPromise = audioRequest
       .catch(error => {
         audioBlobPromises.delete(cacheKey);
         throw error;
@@ -86,16 +99,22 @@ const getAudioBlob = (text, voice) => {
 };
 
 export const preloadKokoroVoice = async (voice, phrases, onProgress) => {
-  await getModel(onProgress);
-  const uniquePhrases = [...new Set(phrases)];
-  for (let index = 0; index < uniquePhrases.length; index += 1) {
-    await getAudioBlob(uniquePhrases[index], voice);
-    onProgress?.({
-      completed: index + 1,
-      status: 'preparing',
-      total: uniquePhrases.length,
-    });
+  if (voice === 'af_heart') {
+    const uniquePhrases = [...new Set(phrases)];
+    let completed = 0;
+    await Promise.all(uniquePhrases.map(async phrase => {
+      await getAudioBlob(phrase, voice);
+      completed += 1;
+      onProgress?.({
+        completed,
+        status: 'preparing',
+        total: uniquePhrases.length,
+      });
+    }));
+    return;
   }
+  await getModel(onProgress);
+  await requestWorker('preload', { phrases, voice }, onProgress);
 };
 
 export const stopKokoroSpeech = () => {
@@ -108,25 +127,33 @@ export const speakWithKokoro = async (text, voice, onProgress, onAudioStart) => 
   const currentRun = ++speechRun;
   await getModel(onProgress);
   if (currentRun !== speechRun) return;
-  const audioBlob = await getAudioBlob(text, voice);
-  if (currentRun !== speechRun) return;
-  const objectUrl = URL.createObjectURL(audioBlob);
-  const audio = new Audio(objectUrl);
-  activeAudio = audio;
-  activeObjectUrl = objectUrl;
-  onAudioStart?.();
+  const phrases = (Array.isArray(text) ? text : [text]).filter(Boolean);
+  let started = false;
 
-  try {
-    await new Promise((resolve, reject) => {
-      activeResolve = resolve;
-      audio.onended = resolve;
-      audio.onerror = () => reject(new Error('Kokoro audio playback failed.'));
-      audio.play().catch(reject);
-    });
-  } finally {
-    if (currentRun === speechRun) {
-      activeResolve = null;
-      cleanUpAudio();
+  for (const phrase of phrases) {
+    const audioBlob = await getAudioBlob(phrase, voice);
+    if (currentRun !== speechRun) return;
+    const objectUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(objectUrl);
+    activeAudio = audio;
+    activeObjectUrl = objectUrl;
+    if (!started) {
+      started = true;
+      onAudioStart?.();
+    }
+
+    try {
+      await new Promise((resolve, reject) => {
+        activeResolve = resolve;
+        audio.onended = resolve;
+        audio.onerror = () => reject(new Error('Kokoro audio playback failed.'));
+        audio.play().catch(reject);
+      });
+    } finally {
+      if (currentRun === speechRun) {
+        activeResolve = null;
+        cleanUpAudio();
+      }
     }
   }
 };
