@@ -148,8 +148,10 @@ export default function App() {
     ));
   };
 
-  const deal = async () => {
-    const activeBets = spotBets.slice(0, numHands);
+  const deal = async (betsOverride = null) => {
+    const activeBets = Array.isArray(betsOverride)
+      ? betsOverride.slice(0, numHands)
+      : spotBets.slice(0, numHands);
     const totalWager = activeBets.reduce((sum, bet) => sum + bet, 0);
     if (activeBets.some(bet => !Number.isFinite(bet) || bet < 5)) {
       announce('Each spot needs a wager of at least 5 dollars.', { listenAfter: true });
@@ -751,7 +753,7 @@ export default function App() {
     playSound('win');
   };
 
-  const stackBets = () => {
+  const stackBets = (dealImmediately = false) => {
     if (!['betting', 'resolved'].includes(gameState)) {
       announce('Stack it is available between rounds.', { listenAfter: true });
       return;
@@ -768,7 +770,11 @@ export default function App() {
     const summary = doubledBets
       .map((bet, index) => `spot ${index + 1}, ${bet} dollars`)
       .join('; ');
-    announce(`Wagers doubled. ${summary}.`, { listenAfter: true });
+    if (dealImmediately) {
+      deal(doubledBets);
+    } else {
+      announce(`Wagers doubled. ${summary}.`, { listenAfter: true });
+    }
   };
 
   const handleVoiceCommand = (command) => {
@@ -872,6 +878,10 @@ export default function App() {
     }
     if (command.type === 'stackBet') {
       stackBets();
+      return;
+    }
+    if (command.type === 'stackAndRun') {
+      stackBets(true);
       return;
     }
     if (command.type === 'runIt') {
