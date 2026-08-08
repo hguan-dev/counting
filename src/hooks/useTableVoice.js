@@ -50,6 +50,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   const onCommandRef = useRef(onCommand);
   const isListeningAllowedRef = useRef(isListeningAllowed);
   const voiceInputEnabledRef = useRef(voiceInputEnabled);
+  const voiceStatusRef = useRef(voiceStatus);
   const speakingRef = useRef(false);
   const selectedVoiceNameRef = useRef(selectedVoiceName);
   const voiceModelStatusRef = useRef(voiceModelStatus);
@@ -63,6 +64,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   onCommandRef.current = onCommand;
   isListeningAllowedRef.current = isListeningAllowed;
   voiceInputEnabledRef.current = voiceInputEnabled;
+  voiceStatusRef.current = voiceStatus;
   selectedVoiceNameRef.current = selectedVoiceName;
   voiceModelStatusRef.current = voiceModelStatus;
 
@@ -228,7 +230,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
         restartAllowedRef.current = false;
         setVoiceInputEnabled(false);
         setVoiceStatus('blocked');
-        setVoiceError('Microphone access is blocked. Allow it in the browser site settings.');
+        setVoiceError('Microphone access is blocked. Allow it in the browser site settings — the table reconnects automatically once granted.');
         return false;
       }
     }
@@ -344,6 +346,59 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       startListening();
     }
   }, [isListeningAllowed]);
+
+  // Mobile browsers report the mic as blocked until the user flips the site
+  // permission, then never announce the change — re-poll on grant and on
+  // returning to the tab so a stale "Mic blocked" state clears itself.
+  useEffect(() => {
+    if (!voiceSupported || typeof window === 'undefined') return undefined;
+    let cancelled = false;
+    let permissionStatus = null;
+
+    const recoverFromBlocked = () => {
+      if (cancelled || voiceStatusRef.current !== 'blocked') return;
+      setVoiceError('');
+      if (voiceInputEnabledRef.current) {
+        restartAllowedRef.current = true;
+        setVoiceStatus('ready');
+        if (isListeningAllowedRef.current) startListening();
+      } else {
+        setVoiceStatus('off');
+      }
+    };
+
+    const handlePermissionChange = () => {
+      if (permissionStatus?.state === 'granted') recoverFromBlocked();
+    };
+
+    const syncPermission = async () => {
+      if (!permissionStatus) {
+        try {
+          permissionStatus = await window.navigator?.permissions?.query({ name: 'microphone' });
+        } catch {
+          permissionStatus = null;
+        }
+        if (cancelled) return;
+        permissionStatus?.addEventListener?.('change', handlePermissionChange);
+      }
+      if (permissionStatus?.state === 'granted') recoverFromBlocked();
+    };
+
+    const handleReturnToTab = () => {
+      if (document.visibilityState === 'hidden') return;
+      syncPermission();
+    };
+
+    syncPermission();
+    window.addEventListener('focus', handleReturnToTab);
+    document.addEventListener('visibilitychange', handleReturnToTab);
+    return () => {
+      cancelled = true;
+      permissionStatus?.removeEventListener?.('change', handlePermissionChange);
+      window.removeEventListener('focus', handleReturnToTab);
+      document.removeEventListener('visibilitychange', handleReturnToTab);
+    };
+  }, [voiceSupported]);
 
   useEffect(() => {
     if (!window.speechSynthesis) return undefined;
