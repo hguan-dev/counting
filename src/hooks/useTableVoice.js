@@ -24,9 +24,16 @@ const SOUND_PATTERNS = {
   win: [[520, 0.07, 0], [660, 0.07, 0.08], [820, 0.12, 0.16]],
 };
 
+const readStoredFlag = (key, fallback) => {
+  if (typeof window === 'undefined') return fallback;
+  const stored = window.localStorage.getItem(key);
+  return stored === null ? fallback : stored === 'true';
+};
+
 export default function useTableVoice({ isListeningAllowed, onCommand }) {
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [speechEnabled, setSpeechEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => readStoredFlag('blackjack-sound-enabled', true));
+  const [speechEnabled, setSpeechEnabled] = useState(() => readStoredFlag('blackjack-speech-enabled', false));
+  const [hasInteracted, setHasInteracted] = useState(false);
   const [voiceInputEnabled, setVoiceInputEnabled] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('off');
   const [voiceError, setVoiceError] = useState('');
@@ -414,7 +421,28 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
   }, []);
 
   useEffect(() => {
-    if (!speechEnabled || !selectedVoiceName.startsWith('kokoro:')) return undefined;
+    window.localStorage.setItem('blackjack-sound-enabled', String(soundEnabled));
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    window.localStorage.setItem('blackjack-speech-enabled', String(speechEnabled));
+  }, [speechEnabled]);
+
+  // Defer voice-asset warmup until the first interaction so page load stays
+  // light — nothing is fetched for visitors who never touch the table.
+  useEffect(() => {
+    if (hasInteracted || typeof window === 'undefined') return undefined;
+    const markInteracted = () => setHasInteracted(true);
+    window.addEventListener('pointerdown', markInteracted, { once: true });
+    window.addEventListener('keydown', markInteracted, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', markInteracted);
+      window.removeEventListener('keydown', markInteracted);
+    };
+  }, [hasInteracted]);
+
+  useEffect(() => {
+    if (!hasInteracted || !speechEnabled || !selectedVoiceName.startsWith('kokoro:')) return undefined;
     let cancelled = false;
     voicePreloadingRef.current = true;
     setVoiceModelStatus('loading');
@@ -448,7 +476,7 @@ export default function useTableVoice({ isListeningAllowed, onCommand }) {
       cancelled = true;
       voicePreloadingRef.current = false;
     };
-  }, [selectedVoiceName, speechEnabled]);
+  }, [selectedVoiceName, speechEnabled, hasInteracted]);
 
   useEffect(() => {
     if (selectedVoiceName) {

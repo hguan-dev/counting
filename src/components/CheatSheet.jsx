@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import StrategyQuiz from './StrategyQuiz';
 import { BET_RAMP_GUIDE_ROWS } from '../utils/betSizing';
 import { DEVIATION_GUIDE_GROUPS } from '../utils/deviations';
 
@@ -65,6 +66,7 @@ export default function CheatSheet({ onClose }) {
     ['strategy', 'Strategy'],
     ['rules', 'How to play'],
     ['counting', 'Counting'],
+    ['quiz', 'Quiz'],
   ];
 
   return (
@@ -200,6 +202,19 @@ export default function CheatSheet({ onClose }) {
                 <li>Spoken prompts pause microphone listening while the dealer talks, then resume automatically.</li>
               </ul>
             </details>
+          </>
+        )}
+
+        {activeTab === 'quiz' && (
+          <>
+            <section className="guide-callout">
+              <span className="guide-callout-icon">?</span>
+              <div>
+                <strong>Drill the decision, not the memory.</strong>
+                <p>Random hand, random count. Pick the play, then read the rule behind it — deviations included.</p>
+              </div>
+            </section>
+            <StrategyQuiz />
           </>
         )}
 

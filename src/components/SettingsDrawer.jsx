@@ -15,12 +15,25 @@ function SettingRow({ label, description, checked, onChange }) {
   );
 }
 
+const TABLE_PACE_OPTIONS = [
+  ['manual', 'Manual', 'You sweep'],
+  ['slow', 'Relaxed', '6s'],
+  ['medium', 'Steady', '3.5s'],
+  ['fast', 'Brisk', '2s'],
+  ['pro', 'Casino', '1.2s'],
+];
+
 export default function SettingsDrawer({
   onClose,
   warnStrategy,
   onWarnStrategyChange,
   showStrategyPopups,
   onStrategyPopupsChange,
+  tablePace,
+  onTablePaceChange,
+  countDrillEnabled,
+  onCountDrillChange,
+  drillStats,
   soundEnabled,
   onSoundChange,
   speechEnabled,
@@ -71,6 +84,38 @@ export default function SettingsDrawer({
               checked={showStrategyPopups}
               onChange={() => onStrategyPopupsChange(!showStrategyPopups)}
             />
+          </section>
+
+          <section>
+            <h3>Training</h3>
+            <SettingRow
+              label="Count check at shuffle"
+              description={drillStats?.attempts
+                ? `Quiz the running count before each new shoe. So far: ${drillStats.exact}/${drillStats.attempts} exact.`
+                : 'Quiz the running count before each new shoe.'}
+              checked={countDrillEnabled}
+              onChange={() => onCountDrillChange(!countDrillEnabled)}
+            />
+            <div className="pace-field">
+              <div className="setting-copy">
+                <strong>Table pace</strong>
+                <span>How quickly cards are swept off the table after payouts.</span>
+              </div>
+              <div className="pace-options" role="radiogroup" aria-label="Table pace">
+                {TABLE_PACE_OPTIONS.map(([value, label, detail]) => (
+                  <button
+                    key={value}
+                    role="radio"
+                    aria-checked={tablePace === value}
+                    className={tablePace === value ? 'is-selected' : ''}
+                    onClick={() => onTablePaceChange(value)}
+                  >
+                    <span>{label}</span>
+                    <small>{detail}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
           </section>
 
           <section>
@@ -125,7 +170,7 @@ export default function SettingsDrawer({
               <li><span>Dealer</span><strong>Hits soft 17</strong></li>
               <li><span>Blackjack</span><strong>Pays 3:2</strong></li>
               <li><span>Insurance</span><strong>Pays 2:1</strong></li>
-              <li><span>Limits</span><strong>$5 – $10,000 · up to 2 spots</strong></li>
+              <li><span>Limits</span><strong>$25 – $10,000 · up to 2 spots</strong></li>
               <li><span>Splits</span><strong>Up to 4 hands per spot</strong></li>
             </ul>
           </section>

@@ -126,7 +126,9 @@ export const stopKokoroSpeech = () => {
 export const speakWithKokoro = async (text, voice, onProgress, onAudioStart) => {
   cleanUpAudio();
   const currentRun = ++speechRun;
-  await getModel(onProgress);
+  // Heart ships fully pre-generated audio assets; only the other voices need
+  // the on-device model, and the worker loads it on demand for cache misses.
+  if (voice !== 'af_heart') await getModel(onProgress);
   if (currentRun !== speechRun) return;
   const phrases = (Array.isArray(text) ? text : [text]).filter(Boolean);
   let started = false;

@@ -21,6 +21,8 @@ import PlayingCard from './components/PlayingCard';
 import SessionChart from './components/SessionChart';
 import BankrollScore from './components/BankrollScore';
 import SettingsDrawer from './components/SettingsDrawer';
+import CountDrillModal from './components/CountDrillModal';
+import ShoeTray from './components/ShoeTray';
 import useTableVoice from './hooks/useTableVoice';
 import {
   getSpokenCountSummary,
@@ -33,6 +35,10 @@ import {
   getUnresolvedHandWager,
   STARTING_BANKROLL,
 } from './utils/sessionAccounting';
+import { loadSessionState, saveSessionState } from './utils/persistence';
+
+const TABLE_PACE_MS = { slow: 6000, medium: 3500, fast: 2000, pro: 1200 };
+const TABLE_PACES = ['manual', 'slow', 'medium', 'fast', 'pro'];
 
 const getChipColor = (denom) => {
   if (denom >= 1000) return '#f97316';
@@ -80,24 +86,53 @@ export default function App() {
   const keyboardActionRef = useRef(null);
   const voiceCommandRef = useRef(null);
   
-  const [bankroll, setBankroll] = useState(STARTING_BANKROLL);
-  const [totalBuyIns, setTotalBuyIns] = useState(0);
-  const [spotBets, setSpotBets] = useState([25, 25]);
-  const [numHands, setNumHands] = useState(1);
+  const [restored] = useState(loadSessionState);
+  const [bankroll, setBankroll] = useState(() => (
+    Number.isFinite(restored?.bankroll) && restored.bankroll >= 0 ? restored.bankroll : STARTING_BANKROLL
+  ));
+  const [totalBuyIns, setTotalBuyIns] = useState(() => (
+    Number.isFinite(restored?.totalBuyIns) && restored.totalBuyIns >= 0 ? restored.totalBuyIns : 0
+  ));
+  const [spotBets, setSpotBets] = useState(() => (
+    Array.isArray(restored?.spotBets) && restored.spotBets.length >= 2
+      ? restored.spotBets.slice(0, 2).map(bet => (Number.isFinite(bet) ? bet : 25))
+      : [25, 25]
+  ));
+  const [numHands, setNumHands] = useState(() => (restored?.numHands === 2 ? 2 : 1));
   const [showReload, setShowReload] = useState(false);
-  const [reloadAmount, setReloadAmount] = useState(500);
-  
-  const [gameState, setGameState] = useState('betting'); 
-  const [playerSpots, setPlayerSpots] = useState([]); 
+  const [reloadAmount, setReloadAmount] = useState(() => (
+    Number.isFinite(restored?.reloadAmount) && restored.reloadAmount > 0 ? restored.reloadAmount : 500
+  ));
+
+  const [gameState, setGameState] = useState('betting');
+  const [playerSpots, setPlayerSpots] = useState([]);
   const [activeSpotIndex, setActiveSpotIndex] = useState(0);
   const [activeSubHandIndex, setActiveSubHandIndex] = useState(0);
   const [dealerHand, setDealerHand] = useState([]);
   const [showCount, setShowCount] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
-  const [sessionHands, setSessionHands] = useState([]);
-  const [strategyDecisions, setStrategyDecisions] = useState(0);
-  const [strategyMistakes, setStrategyMistakes] = useState(0);
+  const [sessionHands, setSessionHands] = useState(() => (
+    Array.isArray(restored?.sessionHands) ? restored.sessionHands : []
+  ));
+  const [strategyDecisions, setStrategyDecisions] = useState(() => (
+    Number.isFinite(restored?.strategyDecisions) ? restored.strategyDecisions : 0
+  ));
+  const [strategyMistakes, setStrategyMistakes] = useState(() => (
+    Number.isFinite(restored?.strategyMistakes) ? restored.strategyMistakes : 0
+  ));
   const [showSettings, setShowSettings] = useState(false);
+  const [tablePace, setTablePace] = useState(() => (
+    TABLE_PACES.includes(restored?.tablePace) ? restored.tablePace : 'manual'
+  ));
+  const [countDrillEnabled, setCountDrillEnabled] = useState(() => (
+    typeof restored?.countDrillEnabled === 'boolean' ? restored.countDrillEnabled : true
+  ));
+  const [countDrillStats, setCountDrillStats] = useState(() => (
+    Number.isFinite(restored?.countDrillStats?.attempts)
+      ? { attempts: restored.countDrillStats.attempts, exact: restored.countDrillStats.exact || 0 }
+      : { attempts: 0, exact: 0 }
+  ));
+  const [countDrill, setCountDrill] = useState(null);
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [sickReactionKey, setSickReactionKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -105,8 +140,12 @@ export default function App() {
   const [insuranceBets, setInsuranceBets] = useState([]);
   const [evenMoneyQueue, setEvenMoneyQueue] = useState([]);
   
-  const [warnStrategy, setWarnStrategy] = useState(true);
-  const [showStrategyPopups, setShowStrategyPopups] = useState(true);
+  const [warnStrategy, setWarnStrategy] = useState(() => (
+    typeof restored?.warnStrategy === 'boolean' ? restored.warnStrategy : true
+  ));
+  const [showStrategyPopups, setShowStrategyPopups] = useState(() => (
+    typeof restored?.showStrategyPopups === 'boolean' ? restored.showStrategyPopups : true
+  ));
   const [pendingAction, setPendingAction] = useState(null);
 
   const {
@@ -252,7 +291,7 @@ export default function App() {
     });
   };
 
-  const deal = async (betsOverride = null, { skipBetWarning = false } = {}) => {
+  const deal = async (betsOverride = null, { skipBetWarning = false, skipCountDrill = false } = {}) => {
     const activeBets = Array.isArray(betsOverride)
       ? betsOverride.slice(0, numHands)
       : spotBets.slice(0, numHands);
@@ -294,6 +333,17 @@ export default function App() {
     }
 
     if (shoeRef.current.needsShuffle()) {
+      if (countDrillEnabled && !skipCountDrill) {
+        setCountDrill({
+          actual: shoeRef.current.visibleRunningCount,
+          bets: activeBets,
+          decksRemaining: shoeRef.current.decksRemaining,
+          trueCount: shoeRef.current.trueCount,
+        });
+        setGameState('countDrill');
+        announce('Shuffle check. What is your running count?');
+        return;
+      }
       setGameState('shuffling');
       loggerRef.current.log('SHUFFLE', 'Shoe penetration limit reached, reshuffling shoe.');
       await new Promise(r => setTimeout(r, 2000));
@@ -1060,6 +1110,57 @@ export default function App() {
     setGameState('betting');
   };
 
+  // Table pace: sweep the cards automatically after payouts, like a live dealer.
+  useEffect(() => {
+    if (gameState !== 'resolved' || tablePace === 'manual') return undefined;
+    const timer = window.setTimeout(() => setGameState('betting'), TABLE_PACE_MS[tablePace]);
+    return () => window.clearTimeout(timer);
+  }, [gameState, tablePace]);
+
+  const resolveCountDrill = (guess) => {
+    const drill = countDrill;
+    setCountDrill(null);
+    if (!drill) return;
+    if (guess !== null && Number.isFinite(guess)) {
+      const difference = Math.abs(guess - drill.actual);
+      setCountDrillStats(current => ({
+        attempts: current.attempts + 1,
+        exact: current.exact + (difference === 0 ? 1 : 0),
+      }));
+      loggerRef.current.log(
+        'COUNT_DRILL',
+        `Shuffle count check: called ${guess}, actual ${drill.actual} (off by ${difference}).`,
+        { difference, guess, runningCount: drill.actual, trueCount: drill.trueCount },
+      );
+    }
+    deal(drill.bets, { skipBetWarning: true, skipCountDrill: true });
+  };
+
+  // Persist the session so a refresh keeps the bankroll, history, and settings.
+  // Mid-round wagers are folded back into the saved bankroll since hands
+  // themselves are not restored.
+  useEffect(() => {
+    saveSessionState({
+      bankroll: bankroll + getUnresolvedHandWager(playerSpots),
+      countDrillEnabled,
+      countDrillStats,
+      numHands,
+      reloadAmount,
+      sessionHands,
+      showStrategyPopups,
+      spotBets,
+      strategyDecisions,
+      strategyMistakes,
+      tablePace,
+      totalBuyIns,
+      warnStrategy,
+    });
+  }, [
+    bankroll, countDrillEnabled, countDrillStats, numHands, playerSpots,
+    reloadAmount, sessionHands, showStrategyPopups, spotBets,
+    strategyDecisions, strategyMistakes, tablePace, totalBuyIns, warnStrategy,
+  ]);
+
   const triggerCelebration = () => {
     setCelebrationKey(current => current + 1);
     playSound('win');
@@ -1501,10 +1602,24 @@ export default function App() {
           voiceModelProgress={voiceModelProgress}
           onPreviewVoice={() => announce('Betting is open.')}
           onExportLog={() => loggerRef.current.downloadCSV()}
+          tablePace={tablePace}
+          onTablePaceChange={setTablePace}
+          countDrillEnabled={countDrillEnabled}
+          onCountDrillChange={setCountDrillEnabled}
+          drillStats={countDrillStats}
         />
       )}
 
-      <PopupModal 
+      {countDrill && (
+        <CountDrillModal
+          actualCount={countDrill.actual}
+          trueCount={countDrill.trueCount}
+          decksRemaining={countDrill.decksRemaining}
+          onResolve={resolveCountDrill}
+        />
+      )}
+
+      <PopupModal
         isOpen={!!pendingAction}
         title={pendingAction?.type === 'betSizing' ? 'Bet sizing check' : 'Are you sure?'}
         category={pendingAction?.category}
@@ -1654,6 +1769,10 @@ export default function App() {
 
       {/* GAME BOARD TABLE */}
       <div className={`game-board is-${gameState}`}>
+        <ShoeTray
+          dealtFraction={1 - shoeRef.current.cards.length / (shoeRef.current.decks * 52)}
+          decks={shoeRef.current.decks}
+        />
         <svg className="table-rule-arc" viewBox="0 0 900 170" aria-hidden="true">
           <defs>
             <path id="table-rule-path" d="M 55 150 Q 450 -90 845 150" />
