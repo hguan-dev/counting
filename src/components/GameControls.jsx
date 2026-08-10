@@ -151,9 +151,11 @@ export default function GameControls({
         </div>
       )}
 
-      {(gameState === 'dealerRevealing' || gameState === 'shuffling') && (
-        <button className="next-round-button" onClick={onNextRound} disabled={gameState === 'dealerRevealing' || gameState === 'shuffling'}>
-          {gameState === 'shuffling' ? 'Shuffling shoe…' : gameState === 'dealerRevealing' ? 'Dealer revealing…' : 'Deal next round'}
+      {(gameState === 'dealerRevealing' || gameState === 'shuffling' || gameState === 'aiPlaying') && (
+        <button className="next-round-button" disabled>
+          {gameState === 'shuffling'
+            ? 'Shuffling shoe…'
+            : gameState === 'aiPlaying' ? 'Table in action…' : 'Dealer revealing…'}
         </button>
       )}
     </div>

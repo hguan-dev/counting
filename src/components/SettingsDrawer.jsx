@@ -34,6 +34,8 @@ export default function SettingsDrawer({
   countDrillEnabled,
   onCountDrillChange,
   drillStats,
+  aiSeatCount,
+  onAiSeatCountChange,
   soundEnabled,
   onSoundChange,
   speechEnabled,
@@ -98,8 +100,28 @@ export default function SettingsDrawer({
             />
             <div className="pace-field">
               <div className="setting-copy">
+                <strong>Table companions</strong>
+                <span>Other players at the table — more cards to count, dealt at the table pace below.</span>
+              </div>
+              <div className="pace-options is-seats" role="radiogroup" aria-label="Table companions">
+                {[[0, 'Just you', 'Heads-up'], [2, '+2 players', 'Lena & Walt'], [4, '+4 players', 'Full table']].map(([value, label, detail]) => (
+                  <button
+                    key={value}
+                    role="radio"
+                    aria-checked={aiSeatCount === value}
+                    className={aiSeatCount === value ? 'is-selected' : ''}
+                    onClick={() => onAiSeatCountChange(value)}
+                  >
+                    <span>{label}</span>
+                    <small>{detail}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="pace-field">
+              <div className="setting-copy">
                 <strong>Table pace</strong>
-                <span>How quickly cards are swept off the table after payouts.</span>
+                <span>How quickly companions act and cards are swept after payouts.</span>
               </div>
               <div className="pace-options" role="radiogroup" aria-label="Table pace">
                 {TABLE_PACE_OPTIONS.map(([value, label, detail]) => (

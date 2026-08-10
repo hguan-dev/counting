@@ -39,6 +39,21 @@ import { loadSessionState, saveSessionState } from './utils/persistence';
 
 const TABLE_PACE_MS = { slow: 6000, medium: 3500, fast: 2000, pro: 1200 };
 const TABLE_PACES = ['manual', 'slow', 'medium', 'fast', 'pro'];
+const AI_ACTION_MS = { fast: 900, manual: 1600, medium: 1400, pro: 550, slow: 2000 };
+const AI_SEAT_COUNTS = [0, 2, 4];
+const AI_SEAT_ROSTER = [
+  { name: 'Lena', position: 'pre' },
+  { name: 'Marcus', position: 'pre' },
+  { name: 'Priya', position: 'post' },
+  { name: 'Walt', position: 'post' },
+];
+const AI_BET_OPTIONS = [25, 25, 50, 50, 75, 100];
+
+const getAiSeatsForCount = (count) => (
+  count === 2
+    ? [AI_SEAT_ROSTER[0], AI_SEAT_ROSTER[3]]
+    : count === 4 ? AI_SEAT_ROSTER : []
+);
 
 const getChipColor = (denom) => {
   if (denom >= 1000) return '#f97316';
@@ -133,6 +148,14 @@ export default function App() {
       : { attempts: 0, exact: 0 }
   ));
   const [countDrill, setCountDrill] = useState(null);
+  const [aiSeatCount, setAiSeatCount] = useState(() => (
+    AI_SEAT_COUNTS.includes(restored?.aiSeatCount) ? restored.aiSeatCount : 0
+  ));
+  const [aiPlayers, setAiPlayers] = useState([]);
+  const aiPlayersRef = useRef([]);
+  const aiPreDoneRef = useRef(false);
+  const aiPostDoneRef = useRef(false);
+  const tablePaceRef = useRef('manual');
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [sickReactionKey, setSickReactionKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -168,9 +191,84 @@ export default function App() {
     voiceStatus,
     voiceSupported,
   } = useTableVoice({
-    isListeningAllowed: !['dealerRevealing', 'shuffling'].includes(gameState),
+    isListeningAllowed: !['dealerRevealing', 'shuffling', 'aiPlaying'].includes(gameState),
     onCommand: command => voiceCommandRef.current?.(command),
   });
+
+  tablePaceRef.current = tablePace;
+
+  const syncAiPlayers = (seats) => {
+    aiPlayersRef.current = seats;
+    setAiPlayers(seats);
+  };
+
+  const updateAiSeat = (index, changes) => {
+    const seats = aiPlayersRef.current.map((seat, seatIndex) => (
+      seatIndex === index ? { ...seat, ...changes } : seat
+    ));
+    syncAiPlayers(seats);
+  };
+
+  // Companions play plain basic strategy — no deviations, no surrender, and
+  // pairs are played as hard totals to keep single-hand seats.
+  const getAiDecision = (cards, dealerUpCard) => {
+    const evaluation = getDetailedPlay(cards, dealerUpCard, 0, { allowSurrender: false });
+    let action = evaluation.action;
+    if (action === 'split') {
+      const total = calculateTotal(cards);
+      const dealerValue = dealerUpCard.numericValue;
+      if (total >= 17) action = 'stand';
+      else if (total >= 13) action = dealerValue >= 2 && dealerValue <= 6 ? 'stand' : 'hit';
+      else if (total === 12) action = dealerValue >= 4 && dealerValue <= 6 ? 'stand' : 'hit';
+      else action = 'hit';
+    }
+    if (action === 'double' && cards.length > 2) action = 'hit';
+    return action;
+  };
+
+  const playAiSeats = async (position, dealerUpCard) => {
+    const delayMs = AI_ACTION_MS[tablePaceRef.current] ?? 1400;
+    for (let index = 0; index < aiPlayersRef.current.length; index++) {
+      if (aiPlayersRef.current[index].position !== position) continue;
+      updateAiSeat(index, { status: 'acting' });
+      let cards = aiPlayersRef.current[index].cards;
+      for (;;) {
+        await new Promise(r => setTimeout(r, delayMs));
+        const action = getAiDecision(cards, dealerUpCard);
+        if (action === 'stand') break;
+        const card = shoeRef.current.draw();
+        shoeRef.current.visibleRunningCount += card.countValue;
+        playSound('card');
+        cards = [...cards, card];
+        updateAiSeat(index, { cards });
+        if (calculateTotal(cards) > 21 || action === 'double') break;
+      }
+      updateAiSeat(index, { status: 'done' });
+    }
+  };
+
+  const runPreSeatTurns = async (dealerUpCard) => {
+    if (!aiPlayersRef.current.length || aiPreDoneRef.current) return;
+    aiPreDoneRef.current = true;
+    setGameState('aiPlaying');
+    await playAiSeats('pre', dealerUpCard);
+  };
+
+  const resolveAiOutcomes = (dealerCards) => {
+    if (!aiPlayersRef.current.length) return;
+    const dealerTotal = calculateTotal(dealerCards);
+    const dealerBlackjack = dealerTotal === 21 && dealerCards.length === 2;
+    syncAiPlayers(aiPlayersRef.current.map((seat) => {
+      const total = calculateTotal(seat.cards);
+      let outcome;
+      if (total > 21) outcome = 'loss';
+      else if (dealerBlackjack) outcome = total === 21 && seat.cards.length === 2 ? 'push' : 'loss';
+      else if (dealerTotal > 21 || total > dealerTotal) outcome = 'win';
+      else if (total < dealerTotal) outcome = 'loss';
+      else outcome = 'push';
+      return { ...seat, outcome, status: 'done' };
+    }));
+  };
 
   useEffect(() => {
     const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -354,9 +452,25 @@ export default function App() {
     playSound('deal');
     setInsuranceBets(new Array(numHands).fill(0));
     setEvenMoneyQueue([]);
-    
+    aiPreDoneRef.current = false;
+    aiPostDoneRef.current = false;
+
     const d1 = shoeRef.current.draw();
     shoeRef.current.visibleRunningCount += d1.countValue;
+
+    const aiSeats = getAiSeatsForCount(aiSeatCount).map((seat) => {
+      const c1 = shoeRef.current.draw();
+      const c2 = shoeRef.current.draw();
+      shoeRef.current.visibleRunningCount += c1.countValue + c2.countValue;
+      return {
+        ...seat,
+        bet: AI_BET_OPTIONS[Math.floor(Math.random() * AI_BET_OPTIONS.length)],
+        cards: [c1, c2],
+        outcome: null,
+        status: 'waiting',
+      };
+    });
+    syncAiPlayers(aiSeats);
 
     const spots = [];
     for (let i = 0; i < numHands; i++) {
@@ -435,6 +549,7 @@ export default function App() {
         });
       });
 
+      resolveAiOutcomes([d1, d2]);
       setBankroll(b => b + netReturn);
       setGameState('resolved');
       logRoundResults([d1, d2], spots);
@@ -466,6 +581,7 @@ export default function App() {
       logRoundResults([d1, d2], spots);
       playSound('win');
     } else {
+      await runPreSeatTurns(d1);
       findFirstActiveHand(
         spots,
         0,
@@ -575,6 +691,7 @@ export default function App() {
         });
       });
       setPlayerSpots(spots);
+      resolveAiOutcomes(dealerHand);
       setBankroll(b => b + netReturn);
       setGameState('resolved');
       logRoundResults(dealerHand, spots, nextInsuranceBets);
@@ -593,6 +710,7 @@ export default function App() {
         });
       });
       setPlayerSpots(spots);
+      await runPreSeatTurns(dealerHand[0]);
       const next = findNextPlayableHand(spots, 0, 0, true);
       if (next) {
         if (winnings > 0) setBankroll(b => b + winnings);
@@ -806,6 +924,11 @@ export default function App() {
   };
 
   const playDealerAndResolve = async (dInitialHand, spots, insBets, presetWinnings, totalWager) => {
+    if (aiPlayersRef.current.length && !aiPostDoneRef.current) {
+      aiPostDoneRef.current = true;
+      setGameState('aiPlaying');
+      await playAiSeats('post', dInitialHand[0]);
+    }
     setGameState('dealerRevealing');
     shoeRef.current.visibleRunningCount += dInitialHand[1].countValue;
 
@@ -816,7 +939,7 @@ export default function App() {
     const needsDealerDraw = spots.some(spot => spot.subHands.some(hand => (
       hand.doubleCardFaceDown
       || (hand.status === 'stood' && !isNaturalBlackjack(hand))
-    )));
+    ))) || aiPlayersRef.current.some(seat => calculateTotal(seat.cards) <= 21);
 
     if (needsDealerDraw && !dealerHasBlackjack) {
       while (calculateTotal(dHand) < 17 || isSoft17(dHand)) {
@@ -899,6 +1022,7 @@ export default function App() {
       });
     });
 
+    resolveAiOutcomes(dHand);
     logRoundResults(dHand, spots, insBets);
     setBankroll(b => b + totalReturn);
     setGameState('resolved');
@@ -1141,6 +1265,7 @@ export default function App() {
   // themselves are not restored.
   useEffect(() => {
     saveSessionState({
+      aiSeatCount,
       bankroll: bankroll + getUnresolvedHandWager(playerSpots),
       countDrillEnabled,
       countDrillStats,
@@ -1156,7 +1281,7 @@ export default function App() {
       warnStrategy,
     });
   }, [
-    bankroll, countDrillEnabled, countDrillStats, numHands, playerSpots,
+    aiSeatCount, bankroll, countDrillEnabled, countDrillStats, numHands, playerSpots,
     reloadAmount, sessionHands, showStrategyPopups, spotBets,
     strategyDecisions, strategyMistakes, tablePace, totalBuyIns, warnStrategy,
   ]);
@@ -1439,7 +1564,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const renderChipStack = (amount, outcome) => {
+  const renderChipStack = (amount, outcome, small = false) => {
     let remaining = amount;
     const chips = [];
     [1000, 500, 100, 25, 5].forEach(d => {
@@ -1450,27 +1575,59 @@ export default function App() {
     if (outcome === 'win') glowClass = 'chip-glow-green';
     else if (outcome === 'loss') glowClass = 'chip-glow-red';
 
+    const chipSize = small ? 26 : 36;
+    const chipLift = small ? 9 : 13;
+
     return (
-      <div className={`chip-stack-container ${glowClass}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '8px', padding: '4px', borderRadius: '50px', transition: 'all 0.4s ease' }}>
+      <div className={`chip-stack-container ${glowClass}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2px', borderRadius: '50px', transition: 'all 0.4s ease' }}>
         {chips.map((c, idx) => (
           <div className="chip-token" key={idx} style={{
-            width: '36px', height: '36px', borderRadius: '50%', background: getChipColor(c),
+            width: `${chipSize}px`, height: `${chipSize}px`, borderRadius: '50%', background: getChipColor(c),
             border: '2px dashed #fff', boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '0.7rem', fontWeight: 'bold', color: '#fff',
-            transform: `translateY(-${idx * 13}px)`, zIndex: idx,
+            fontSize: small ? '0.56rem' : '0.7rem', fontWeight: 'bold', color: '#fff',
+            transform: `translateY(-${idx * chipLift}px)`, zIndex: idx,
             animationDelay: `${idx * 35}ms`,
           }}>${c >= 1000 ? `${c / 1000}K` : c}</div>
         ))}
-        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#f1c40f', marginTop: `-${Math.max(0, chips.length - 1) * 13}px` }}>${amount}</div>
+        <div style={{ fontSize: small ? '0.62rem' : '0.8rem', fontWeight: '600', color: '#f1c40f', marginTop: `-${Math.max(0, chips.length - 1) * chipLift}px` }}>${amount}</div>
       </div>
     );
   };
 
+  const renderAiSeat = (seat) => {
+    const total = calculateTotal(seat.cards);
+    return (
+      <div
+        key={seat.name}
+        className={`ai-seat ${seat.status === 'acting' ? 'is-acting' : ''} ${seat.outcome ? `is-${seat.outcome}` : ''}`}
+      >
+        <span className="ai-name">{seat.name}</span>
+        <div className="ai-cards">
+          {seat.cards.map((card, cardIndex) => (
+            <PlayingCard key={cardIndex} card={card} compact delay={cardIndex * 70} />
+          ))}
+        </div>
+        <span className={`ai-total ${total > 21 ? 'is-bust' : ''}`}>
+          {total > 21 ? 'Bust' : total}
+          {seat.outcome && <b>{seat.outcome}</b>}
+        </span>
+        <div className="bet-circle is-small">{renderChipStack(seat.bet, seat.outcome, true)}</div>
+      </div>
+    );
+  };
+
+  const renderIdleSeat = (seat) => (
+    <div key={seat.name} className="ai-seat is-idle">
+      <span className="ai-name">{seat.name}</span>
+      <div className="bet-circle is-small is-empty" />
+    </div>
+  );
+
   const accuracyRate = strategyDecisions > 0
     ? Math.round(((strategyDecisions - strategyMistakes) / strategyDecisions) * 100)
     : 0;
-  const hasOpenRound = ['playing', 'insurance', 'evenMoney', 'dealerRevealing'].includes(gameState);
+  const hasOpenRound = ['playing', 'insurance', 'evenMoney', 'dealerRevealing', 'aiPlaying'].includes(gameState);
   const unresolvedHandWager = hasOpenRound ? getUnresolvedHandWager(playerSpots) : 0;
   const insuranceStillAtRisk = gameState === 'insurance'
     || (
@@ -1607,6 +1764,8 @@ export default function App() {
           countDrillEnabled={countDrillEnabled}
           onCountDrillChange={setCountDrillEnabled}
           drillStats={countDrillStats}
+          aiSeatCount={aiSeatCount}
+          onAiSeatCountChange={setAiSeatCount}
         />
       )}
 
@@ -1727,6 +1886,9 @@ export default function App() {
       )}
 
       {showReload && (
+        <div className="popover-scrim" onClick={() => setShowReload(false)} aria-hidden="true" />
+      )}
+      {showReload && (
         <section className="session-panel" aria-label="Session analytics and bankroll reload">
           <SessionChart hands={sessionHands} />
           <div className="reload-panel">
@@ -1773,6 +1935,10 @@ export default function App() {
           dealtFraction={1 - shoeRef.current.cards.length / (shoeRef.current.decks * 52)}
           decks={shoeRef.current.decks}
         />
+        <div className="dealer-shoe" aria-hidden="true">
+          <i />
+          <span>Shoe</span>
+        </div>
         <svg className="table-rule-arc" viewBox="0 0 900 170" aria-hidden="true">
           <defs>
             <path id="table-rule-path" d="M 55 150 Q 450 -90 845 150" />
@@ -1853,56 +2019,72 @@ export default function App() {
             {/* PLAYER SPOTS */}
             <div className="hand-zone player-zone">
               <div className="zone-label"><span>Your hands</span><strong>{playerSpots.reduce((sum, spot) => sum + spot.subHands.length, 0) || '—'}</strong></div>
-              <div className="player-spots" style={{ display: 'flex', gap: '3rem', justifyContent: 'center', minHeight: '130px' }}>
+              <div className="player-spots">
                 {gameState === 'betting' ? (
-                  <div className="betting-prompt">
-                    <span>PLACE YOUR WAGER</span>
-                    <small>Choose separate wagers and the number of spots below</small>
+                  <div className="table-seats is-betting">
+                    {getAiSeatsForCount(aiSeatCount).filter(seat => seat.position === 'pre').map(renderIdleSeat)}
+                    {Array.from({ length: numHands }, (_, spotIndex) => (
+                      <div className="user-seat" key={spotIndex}>
+                        <div className="bet-circle">
+                          {isValidTableWager(spotBets[spotIndex])
+                            ? renderChipStack(spotBets[spotIndex])
+                            : <span className="bet-circle-hint">BET</span>}
+                        </div>
+                        <span className="ai-name is-you">You{numHands > 1 ? ` · ${spotIndex + 1}` : ''}</span>
+                      </div>
+                    ))}
+                    {getAiSeatsForCount(aiSeatCount).filter(seat => seat.position === 'post').map(renderIdleSeat)}
                   </div>
                 ) : (
-                  playerSpots.map((spot, sIdx) => (
-                    <div key={sIdx} className="spot-group">
-                      {spot.subHands.map((hand, hIdx) => {
-                        const isActive = sIdx === activeSpotIndex && hIdx === activeSubHandIndex && gameState === 'playing';
-                        const isNaturalBJ = isNaturalBlackjack(hand);
-                        return (
-                          <div key={hIdx} className={`player-hand ${isActive ? 'is-active' : ''} ${hand.outcome ? `is-${hand.outcome}` : ''}`}>
-                            <div className="hand-meta">
-                              <span>{spot.subHands.length > 1 ? `Split hand ${hIdx + 1}` : `Spot ${sIdx + 1}`}</span>
-                              {hand.outcome && <b>{hand.outcome}</b>}
-                            </div>
-                            <div className="hand-cards">
-                                {hand.cards.map((card, cIdx) => {
-                                  const isDoubleCard = hand.isDoubled && cIdx === hand.cards.length - 1;
-                                  return (
-                                    <PlayingCard
-                                      key={cIdx}
-                                      card={card}
-                                      compact
-                                      delay={cIdx * 70}
-                                      hidden={isDoubleCard && hand.doubleCardFaceDown}
-                                      peel={isDoubleCard && hand.doubleCardPeeling}
-                                    />
-                                  );
-                                })}
-                            </div>
-                            <div className="hand-total">
-                              <span>
-                                {isNaturalBJ
-                                  ? 'Blackjack'
-                                  : hand.doubleCardFaceDown ? 'Double card down' : 'Total'}
-                              </span>
-                              <strong>{hand.doubleCardFaceDown ? '—' : calculateTotal(hand.cards)}</strong>
+                  <div className="table-seats">
+                    {aiPlayers.filter(seat => seat.position === 'pre').map(renderAiSeat)}
+                    {playerSpots.map((spot, sIdx) => (
+                      <div key={sIdx} className="spot-group">
+                        {spot.subHands.map((hand, hIdx) => {
+                          const isActive = sIdx === activeSpotIndex && hIdx === activeSubHandIndex && gameState === 'playing';
+                          const isNaturalBJ = isNaturalBlackjack(hand);
+                          return (
+                            <div key={hIdx} className={`player-hand ${isActive ? 'is-active' : ''} ${hand.outcome ? `is-${hand.outcome}` : ''}`}>
+                              <div className="hand-meta">
+                                <span>{spot.subHands.length > 1 ? `Split hand ${hIdx + 1}` : `Spot ${sIdx + 1}`}</span>
+                                {hand.outcome && <b>{hand.outcome}</b>}
                               </div>
-                            {renderChipStack(
-                              hand.outcome === 'surrender' ? hand.bet / 2 : hand.bet,
-                              hand.outcome,
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))
+                              <div className="hand-cards">
+                                  {hand.cards.map((card, cIdx) => {
+                                    const isDoubleCard = hand.isDoubled && cIdx === hand.cards.length - 1;
+                                    return (
+                                      <PlayingCard
+                                        key={cIdx}
+                                        card={card}
+                                        compact
+                                        delay={cIdx * 70}
+                                        hidden={isDoubleCard && hand.doubleCardFaceDown}
+                                        peel={isDoubleCard && hand.doubleCardPeeling}
+                                      />
+                                    );
+                                  })}
+                              </div>
+                              <div className="hand-total">
+                                <span>
+                                  {isNaturalBJ
+                                    ? 'Blackjack'
+                                    : hand.doubleCardFaceDown ? 'Double card down' : 'Total'}
+                                </span>
+                                <strong>{hand.doubleCardFaceDown ? '—' : calculateTotal(hand.cards)}</strong>
+                                </div>
+                              <div className="bet-circle">
+                                {renderChipStack(
+                                  hand.outcome === 'surrender' ? hand.bet / 2 : hand.bet,
+                                  hand.outcome,
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                    {aiPlayers.filter(seat => seat.position === 'post').map(renderAiSeat)}
+                  </div>
                 )}
               </div>
             </div>
