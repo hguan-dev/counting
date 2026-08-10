@@ -1996,7 +1996,7 @@ export default function App() {
               <div className="zone-label">
                 <span>Dealer</span>
                 <strong>
-                  {gameState === 'playing' || gameState === 'insurance' || gameState === 'evenMoney'
+                  {['playing', 'insurance', 'evenMoney', 'aiPlaying'].includes(gameState)
                     ? dealerHand.length ? calculateTotal([dealerHand[0]]) : '—'
                     : dealerHand.length > 0 ? calculateTotal(dealerHand) : '—'}
                 </strong>
@@ -2009,7 +2009,7 @@ export default function App() {
                   </div>
                 ) : (
                   dealerHand.map((card, i) => {
-                    const hidden = (gameState === 'playing' || gameState === 'insurance' || gameState === 'evenMoney') && i === 1;
+                    const hidden = ['playing', 'insurance', 'evenMoney', 'aiPlaying'].includes(gameState) && i === 1;
                     return <PlayingCard key={i} card={card} hidden={hidden} delay={i * 90} />;
                   })
                 )}
@@ -2022,7 +2022,7 @@ export default function App() {
               <div className="player-spots">
                 {gameState === 'betting' ? (
                   <div className="table-seats is-betting">
-                    {getAiSeatsForCount(aiSeatCount).filter(seat => seat.position === 'pre').map(renderIdleSeat)}
+                    {getAiSeatsForCount(aiSeatCount).filter(seat => seat.position === 'post').reverse().map(renderIdleSeat)}
                     {Array.from({ length: numHands }, (_, spotIndex) => (
                       <div className="user-seat" key={spotIndex}>
                         <div className="bet-circle">
@@ -2033,11 +2033,11 @@ export default function App() {
                         <span className="ai-name is-you">You{numHands > 1 ? ` · ${spotIndex + 1}` : ''}</span>
                       </div>
                     ))}
-                    {getAiSeatsForCount(aiSeatCount).filter(seat => seat.position === 'post').map(renderIdleSeat)}
+                    {getAiSeatsForCount(aiSeatCount).filter(seat => seat.position === 'pre').reverse().map(renderIdleSeat)}
                   </div>
                 ) : (
                   <div className="table-seats">
-                    {aiPlayers.filter(seat => seat.position === 'pre').map(renderAiSeat)}
+                    {aiPlayers.filter(seat => seat.position === 'post').reverse().map(renderAiSeat)}
                     {playerSpots.map((spot, sIdx) => (
                       <div key={sIdx} className="spot-group">
                         {spot.subHands.map((hand, hIdx) => {
@@ -2083,7 +2083,7 @@ export default function App() {
                         })}
                       </div>
                     ))}
-                    {aiPlayers.filter(seat => seat.position === 'post').map(renderAiSeat)}
+                    {aiPlayers.filter(seat => seat.position === 'pre').reverse().map(renderAiSeat)}
                   </div>
                 )}
               </div>
