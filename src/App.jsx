@@ -1130,8 +1130,10 @@ export default function App() {
   const handleAction = (actionType) => {
     setHintedAction(null);
     const curHand = getCurrentActiveHand();
-    if (!warnStrategy) return executeRequestedAction(actionType);
+    if (!curHand || !dealerHand[0]) return executeRequestedAction(actionType);
 
+    // Every decision is graded for accuracy; the guard only decides whether
+    // a mistake interrupts you.
     const evaluation = getDetailedPlay(
       curHand.cards,
       dealerHand[0],
@@ -1147,7 +1149,7 @@ export default function App() {
     const strategyAction = actionType === 'doubleFaceDown' ? 'double' : actionType;
     
     if (strategyAction !== optimal) {
-      if (!showStrategyPopups) {
+      if (!warnStrategy || !showStrategyPopups) {
         setStrategyDecisions(current => current + 1);
         setStrategyMistakes(current => current + 1);
         executeRequestedAction(actionType);
