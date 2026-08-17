@@ -18,7 +18,7 @@ import CheatSheet from './components/CheatSheet';
 import PopupModal from './components/PopupModal';
 import GameControls from './components/GameControls';
 import PlayingCard from './components/PlayingCard';
-import SessionChart from './components/SessionChart';
+import SessionOverlay from './components/SessionOverlay';
 import BankrollScore from './components/BankrollScore';
 import SettingsDrawer from './components/SettingsDrawer';
 import CountDrillModal from './components/CountDrillModal';
@@ -40,6 +40,7 @@ import {
   STARTING_BANKROLL,
 } from './utils/sessionAccounting';
 import { loadSessionState, saveSessionState } from './utils/persistence';
+import { loadSessionHistory, saveSessionHistory, summarizeSession } from './utils/sessionHistory';
 import {
   loadProfile,
   recordDecisions,
@@ -123,6 +124,10 @@ export default function App() {
   
   const [restored] = useState(loadSessionState);
   const [profile, setProfile] = useState(loadProfile);
+  const [history, setHistory] = useState(loadSessionHistory);
+  const [viewedSession, setViewedSession] = useState(null);
+  const strategyStatsRef = useRef({ decisions: 0, mistakes: 0 });
+  const sessionStartedRef = useRef(null);
   const profileDeltaRef = useRef({ decisions: null, hands: null, mistakes: null });
   const [rules, setRules] = useState(() => normalizeRules(restored?.rules));
   const [betSpread, setBetSpread] = useState(() => normalizeBetSpread(restored?.betSpread));
@@ -224,6 +229,7 @@ export default function App() {
   });
 
   tablePaceRef.current = tablePace;
+  strategyStatsRef.current = { decisions: strategyDecisions, mistakes: strategyMistakes };
 
   const syncAiPlayers = (seats) => {
     aiPlayersRef.current = seats;
@@ -386,7 +392,16 @@ export default function App() {
           : 0;
         const insuranceReturn = insuranceBet > 0 && dealerBlackjack ? insuranceBet * 3 : 0;
         const handNet = returnAmount - hand.bet + insuranceReturn - insuranceBet;
-        settledHands.push({ net: handNet, trueCount: closingTrueCount });
+        settledHands.push({
+          bet: hand.bet,
+          dealerCards: formatCards(finalDealerHand),
+          dealerTotal,
+          net: handNet,
+          outcome: hand.outcome,
+          playerCards: formatCards(hand.cards),
+          playerTotal: calculateTotal(hand.cards),
+          trueCount: closingTrueCount,
+        });
         loggerRef.current.log(
           'ROUND_RESULT',
           `Spot ${spotIndex + 1}, hand ${handIndex + 1}: ${hand.outcome}; player ${calculateTotal(hand.cards)}, dealer ${dealerTotal}.`,
@@ -426,6 +441,7 @@ export default function App() {
         );
       }
     });
+    const { decisions, mistakes } = strategyStatsRef.current;
     setSessionHands(current => {
       let cumulativePnl = current.at(-1)?.cumulativePnl || 0;
       const nextHands = settledHands.map((hand, index) => {
@@ -433,7 +449,10 @@ export default function App() {
         return {
           ...hand,
           cumulativePnl,
+          decisions,
           handNumber: current.length + index + 1,
+          mistakes,
+          at: Date.now(),
         };
       });
       return [...current, ...nextHands];
@@ -1353,8 +1372,33 @@ export default function App() {
     saveProfile(profile);
   }, [profile]);
 
+  useEffect(() => {
+    saveSessionHistory(history);
+  }, [history]);
+
+  useEffect(() => {
+    if (!sessionStartedRef.current) {
+      sessionStartedRef.current = restored?.sessionStartedAt || sessionHands[0]?.at || Date.now();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const resetSession = () => {
     if (!['betting', 'resolved'].includes(gameState)) return;
+    if (sessionHands.length > 0 || strategyDecisions > 0) {
+      const record = summarizeSession({
+        buyIns: totalBuyIns,
+        countDrillStats,
+        decisions: strategyDecisions,
+        endedAt: Date.now(),
+        hands: sessionHands,
+        mistakes: strategyMistakes,
+        rules,
+        startedAt: sessionStartedRef.current || sessionHands[0]?.at || Date.now(),
+      });
+      setHistory(current => [...current, record].slice(-40));
+    }
+    sessionStartedRef.current = Date.now();
     setProfile(current => startNewSession(recordSessionPnl(current, sessionPnl)));
     setBankroll(STARTING_BANKROLL);
     setTotalBuyIns(0);
@@ -1391,6 +1435,7 @@ export default function App() {
       strategyDecisions,
       strategyMistakes,
       tablePace,
+      sessionStartedAt: sessionStartedRef.current,
       totalBuyIns,
       warnBetSizing,
       warnStrategy,
@@ -1723,6 +1768,19 @@ export default function App() {
     );
   };
 
+  // Casino deal order: first base (Lena) → ... → you → ... → dealer, twice.
+  const dealOrder = [
+    ...aiPlayers.filter(seat => seat.position === 'pre').map(seat => `seat:${seat.name}`),
+    ...playerSpots.map((_, spotIndex) => `spot:${spotIndex}`),
+    ...aiPlayers.filter(seat => seat.position === 'post').map(seat => `seat:${seat.name}`),
+    'dealer',
+  ];
+  const getDealDelay = (seatKey, cardIndex) => {
+    if (cardIndex > 1) return 0;
+    const seatIndex = Math.max(0, dealOrder.indexOf(seatKey));
+    return (cardIndex * dealOrder.length + seatIndex) * DEAL_STEP_MS;
+  };
+
   const renderAiSeat = (seat) => {
     const total = calculateTotal(seat.cards);
     return (
@@ -1921,6 +1979,9 @@ export default function App() {
             pnl: sessionPnl,
           }}
           onResetSession={resetSession}
+          history={history}
+          onViewSession={(session) => { setShowSettings(false); setViewedSession(session); }}
+          onViewLiveSession={() => { setShowSettings(false); setShowSession(true); }}
         />
       )}
 
@@ -2042,17 +2103,11 @@ export default function App() {
         </div>
       )}
 
-      {(showReload || showSession) && (
-        <div
-          className="popover-scrim"
-          onClick={() => { setShowReload(false); setShowSession(false); }}
-          aria-hidden="true"
-        />
+      {showReload && (
+        <div className="popover-scrim" onClick={() => setShowReload(false)} aria-hidden="true" />
       )}
-      {(showReload || showSession) && (
-        <section className="session-panel" aria-label="Session analytics and bankroll reload">
-          {showSession && <SessionChart hands={sessionHands} />}
-          {showReload && (
+      {showReload && (
+        <section className="session-panel" aria-label="Bankroll reload">
           <div className="reload-panel">
             <div className="reload-copy">
               <span className="eyebrow">Buy in</span>
@@ -2080,8 +2135,23 @@ export default function App() {
             </label>
             <button className="reload-confirm" onClick={() => addToBankroll()}>Add funds</button>
           </div>
-          )}
         </section>
+      )}
+
+      {(showSession || viewedSession) && (
+        <SessionOverlay
+          live={!viewedSession}
+          session={viewedSession || summarizeSession({
+            buyIns: totalBuyIns,
+            countDrillStats,
+            decisions: strategyDecisions,
+            hands: sessionHands,
+            mistakes: strategyMistakes,
+            rules,
+            startedAt: sessionStartedRef.current,
+          })}
+          onClose={() => { setShowSession(false); setViewedSession(null); }}
+        />
       )}
 
       {showCount && (

@@ -6,6 +6,7 @@ import {
   PENETRATION_OPTIONS,
 } from '../utils/tableRules';
 import { ACHIEVEMENTS, getRank } from '../utils/profile';
+import { summarizeHistory } from '../utils/sessionHistory';
 
 const formatSigned = value => `${value >= 0 ? '+' : '−'}$${Math.abs(Math.round(value)).toLocaleString()}`;
 
@@ -53,6 +54,9 @@ export default function SettingsDrawer({
   profile,
   sessionStatus,
   onResetSession,
+  history = [],
+  onViewSession,
+  onViewLiveSession,
   soundEnabled,
   onSoundChange,
   speechEnabled,
@@ -79,6 +83,9 @@ export default function SettingsDrawer({
     ? Math.round(((profile.decisions - profile.mistakes) / profile.decisions) * 100)
     : 0;
   const unlocked = ACHIEVEMENTS.filter(achievement => achievement.unlocked(profile || {}));
+  const analytics = summarizeHistory(history);
+  const recentSessions = [...history].reverse().slice(0, 12);
+  const formatDate = timestamp => (timestamp ? new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—');
 
   const voiceStatusLabel = voiceModelStatus === 'loading'
     ? `Loading voice model ${voiceModelProgress ? `· ${voiceModelProgress}%` : '…'}`
@@ -131,6 +138,39 @@ export default function SettingsDrawer({
                 );
               })}
             </div>
+          </section>
+
+          <section>
+            <h3>History &amp; analytics</h3>
+            <div className="profile-stats">
+              <div><span>Sessions</span><strong>{analytics.sessions}</strong></div>
+              <div><span>Total P&amp;L</span><strong className={analytics.totalPnl >= 0 ? 'is-positive' : 'is-negative'}>{formatSigned(analytics.totalPnl)}</strong></div>
+              <div><span>Avg stars</span><strong>{analytics.averageStars ? analytics.averageStars.toFixed(1) : '—'}</strong></div>
+              <div><span>Hands logged</span><strong>{analytics.totalHands.toLocaleString()}</strong></div>
+              <div><span>Accuracy</span><strong>{analytics.sessions ? `${analytics.lifetimeAccuracy}%` : '—'}</strong></div>
+              <div><span>3-star runs</span><strong>{analytics.threeStar}</strong></div>
+            </div>
+            <button className="settings-export history-live" onClick={onViewLiveSession}>
+              View live session graph
+            </button>
+            {recentSessions.length > 0 ? (
+              <ul className="history-list">
+                {recentSessions.map(session => (
+                  <li key={session.id}>
+                    <button type="button" onClick={() => onViewSession(session)}>
+                      <span className="history-date">{formatDate(session.startedAt)}</span>
+                      <span className="history-stars" aria-label={`${session.rating?.stars || 0} stars`}>
+                        {[1, 2, 3].map(index => <i key={index} className={index <= (session.rating?.stars || 0) ? 'is-lit' : ''}>★</i>)}
+                      </span>
+                      <span className="history-meta">{session.hands.length} hands · {session.accuracy}%</span>
+                      <strong className={session.pnl >= 0 ? 'is-positive' : 'is-negative'}>{formatSigned(session.pnl)}</strong>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="settings-note">Finished sessions land here with a star rating and a replayable graph. Reset a session to log it.</p>
+            )}
           </section>
 
           <section>
