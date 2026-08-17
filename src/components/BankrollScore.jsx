@@ -14,6 +14,8 @@ export default function BankrollScore({
   accuracyRate = null,
   reloadOpen,
   onToggleReload,
+  sessionOpen = false,
+  onToggleSession,
 }) {
   const [displayValue, setDisplayValue] = useState(value);
   const [delta, setDelta] = useState(null);
@@ -50,7 +52,20 @@ export default function BankrollScore({
 
   return (
     <div className="bankroll-score">
-      <div className="bankroll-panel">
+      <div
+        className={`bankroll-panel ${sessionOpen ? 'is-open' : ''}`}
+        role="button"
+        tabIndex={0}
+        aria-expanded={sessionOpen}
+        aria-label="Bankroll. Show session performance"
+        onClick={() => onToggleSession?.()}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onToggleSession?.();
+          }
+        }}
+      >
         <span className="bankroll-label">Bankroll</span>
         <div className="bankroll-row">
           <strong className="bankroll-amount" aria-label={`Bankroll $${formatMoney(value)}`}>
@@ -59,7 +74,10 @@ export default function BankrollScore({
           </strong>
           <button
             className="bankroll-reload"
-            onClick={onToggleReload}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleReload();
+            }}
             aria-expanded={reloadOpen}
             aria-label="Add funds to bankroll"
             title="Add funds"

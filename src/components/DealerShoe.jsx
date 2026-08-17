@@ -1,3 +1,6 @@
+// A real shoe is never filled to the brim — leave headroom above the stack.
+const STACK_MAX_PERCENT = 70;
+
 export default function DealerShoe({ remainingFraction, cutFraction, decksRemaining }) {
   const remaining = Math.min(1, Math.max(0, remainingFraction));
   const cut = Math.min(1, Math.max(0, cutFraction));
@@ -12,11 +15,11 @@ export default function DealerShoe({ remainingFraction, cutFraction, decksRemain
       <i>
         <span
           className="dealer-shoe-stack"
-          style={{ height: `${Math.max(2, remaining * 100)}%` }}
+          style={{ height: `${Math.max(1.5, remaining * STACK_MAX_PERCENT)}%` }}
         />
         <span
           className={`dealer-shoe-cut ${remaining <= cut ? 'is-reached' : ''}`}
-          style={{ bottom: `${cut * 100}%` }}
+          style={{ bottom: `calc(7px + ${cut * STACK_MAX_PERCENT}%)` }}
           aria-hidden="true"
         />
       </i>

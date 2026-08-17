@@ -13,7 +13,7 @@ export default function ShoeTray({ dealtFraction, decks }) {
       <div className="shoe-tray-well">
         <div
           className="shoe-tray-fill"
-          style={{ height: `${Math.max(1.5, clamped * 100)}%` }}
+          style={{ height: `${Math.max(1.5, clamped * 84)}%` }}
         />
       </div>
       <span className="shoe-tray-label">Discards</span>

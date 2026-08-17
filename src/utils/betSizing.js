@@ -1,11 +1,15 @@
 export const BET_UNIT = 25;
+export const TABLE_MIN_BET = 5;
 export const TABLE_MAX_BET = 10000;
+export const CHIP_STEP = 2.5;
 
+// Any chip combination from the rack is a legal wager: $5 minimum, $10,000
+// maximum, in $2.50 steps (the smallest chip).
 export const isValidTableWager = wager => (
   Number.isFinite(wager)
-  && wager >= BET_UNIT
+  && wager >= TABLE_MIN_BET
   && wager <= TABLE_MAX_BET
-  && wager % BET_UNIT === 0
+  && Math.abs(wager / CHIP_STEP - Math.round(wager / CHIP_STEP)) < 1e-9
 );
 
 export const getRecommendedWager = (trueCount) => {

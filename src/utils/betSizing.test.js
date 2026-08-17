@@ -15,12 +15,14 @@ describe('the fixed $25-unit bet ramp', () => {
     expect(getRecommendedWager(trueCount)).toBe(wager);
   });
 
-  test('accepts only table wagers in $25 increments', () => {
+  test('accepts any chip combination from $5 to the table max', () => {
     expect(isValidTableWager(25)).toBe(true);
+    expect(isValidTableWager(30)).toBe(true);
+    expect(isValidTableWager(32.5)).toBe(true);
     expect(isValidTableWager(150)).toBe(true);
     expect(isValidTableWager(10000)).toBe(true);
-    expect(isValidTableWager(20)).toBe(false);
-    expect(isValidTableWager(55)).toBe(false);
-    expect(isValidTableWager(10025)).toBe(false);
+    expect(isValidTableWager(2.5)).toBe(false);
+    expect(isValidTableWager(31)).toBe(false);
+    expect(isValidTableWager(10002.5)).toBe(false);
   });
 });

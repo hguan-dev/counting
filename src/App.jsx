@@ -24,13 +24,14 @@ import SettingsDrawer from './components/SettingsDrawer';
 import CountDrillModal from './components/CountDrillModal';
 import ShoeTray from './components/ShoeTray';
 import DealerShoe from './components/DealerShoe';
+import ChipRack from './components/ChipRack';
 import useTableVoice from './hooks/useTableVoice';
 import {
   getSpokenCountSummary,
   getSpokenHandTotal,
 } from './utils/tableSpeech';
 import { getKeyboardCommand } from './utils/keyboardShortcuts';
-import { BET_UNIT, isValidTableWager } from './utils/betSizing';
+import { BET_UNIT, isValidTableWager, TABLE_MAX_BET, TABLE_MIN_BET } from './utils/betSizing';
 import { DEFAULT_RULES, normalizeRules } from './utils/tableRules';
 import { getSpreadBet, normalizeBetSpread } from './utils/betSpread';
 import {
@@ -39,6 +40,17 @@ import {
   STARTING_BANKROLL,
 } from './utils/sessionAccounting';
 import { loadSessionState, saveSessionState } from './utils/persistence';
+import {
+  loadProfile,
+  recordDecisions,
+  recordDrill,
+  recordFullTableCasinoRound,
+  recordHands,
+  recordSessionPnl,
+  recordShoe,
+  saveProfile,
+  startNewSession,
+} from './utils/profile';
 
 const TABLE_PACE_MS = { slow: 6000, medium: 3500, fast: 2000, pro: 1200 };
 const TABLE_PACES = ['manual', 'slow', 'medium', 'fast', 'pro'];
@@ -60,9 +72,9 @@ const getAiSeatsForCount = (count) => (
 );
 
 const getChipColor = (denom) => {
-  if (denom >= 1000) return '#f97316';
-  if (denom >= 500) return '#a29bfe';
-  if (denom >= 100) return '#111111';
+  if (denom >= 1000) return '#f39c12';
+  if (denom >= 500) return '#8e7cc3';
+  if (denom >= 100) return '#1c1c1c';
   if (denom >= 25) return '#27ae60';
   if (denom >= 5) return '#c0392b';
   return '#e84393';
@@ -110,6 +122,8 @@ export default function App() {
   const voiceCommandRef = useRef(null);
   
   const [restored] = useState(loadSessionState);
+  const [profile, setProfile] = useState(loadProfile);
+  const profileDeltaRef = useRef({ decisions: null, hands: null, mistakes: null });
   const [rules, setRules] = useState(() => normalizeRules(restored?.rules));
   const [betSpread, setBetSpread] = useState(() => normalizeBetSpread(restored?.betSpread));
   const [bankroll, setBankroll] = useState(() => (
@@ -125,6 +139,7 @@ export default function App() {
   ));
   const [numHands, setNumHands] = useState(() => (restored?.numHands === 2 ? 2 : 1));
   const [showReload, setShowReload] = useState(false);
+  const [showSession, setShowSession] = useState(false);
   const [reloadAmount, setReloadAmount] = useState(() => (
     Number.isFinite(restored?.reloadAmount) && restored.reloadAmount > 0 ? restored.reloadAmount : 500
   ));
@@ -320,6 +335,29 @@ export default function App() {
     )));
   };
 
+  const addChipToBet = (denomination, spotIndex = 0) => {
+    if (gameState !== 'betting') return;
+    if (spotIndex < 0 || spotIndex >= numHands) return;
+    const otherWagers = spotBets.slice(0, numHands).reduce((sum, bet, index) => sum + (index === spotIndex ? 0 : bet), 0);
+    const currentBet = spotBets[spotIndex] || 0;
+    const nextBet = Math.min(TABLE_MAX_BET, currentBet + denomination);
+    if (otherWagers + nextBet > bankroll) {
+      announce('Not enough chips in the rack for that wager.', { listenAfter: true });
+      return;
+    }
+    playSound('chips');
+    updateSpotBet(spotIndex, nextBet);
+  };
+
+  const removeChipFromBet = (denomination, spotIndex = 0) => {
+    if (gameState !== 'betting') return;
+    const currentBet = spotBets[spotIndex] || 0;
+    const nextBet = Math.max(TABLE_MIN_BET, Math.round((currentBet - denomination) * 2) / 2);
+    if (nextBet === currentBet) return;
+    playSound('chips');
+    updateSpotBet(spotIndex, nextBet);
+  };
+
   const updateSpotCount = (count) => {
     const safeCount = count === 2 ? 2 : 1;
     setNumHands(safeCount);
@@ -408,7 +446,7 @@ export default function App() {
       : spotBets.slice(0, numHands);
     const totalWager = activeBets.reduce((sum, bet) => sum + bet, 0);
     if (activeBets.some(bet => !isValidTableWager(bet))) {
-      announce('Each spot needs a wager from 25 to 10000 dollars in 25 dollar units.', { listenAfter: true });
+      announce('Each spot needs a wager from 5 to 10000 dollars.', { listenAfter: true });
       return;
     }
     if (bankroll < totalWager) {
@@ -461,6 +499,7 @@ export default function App() {
       }
       setGameState('shuffling');
       loggerRef.current.log('SHUFFLE', 'Shoe penetration limit reached, reshuffling shoe.');
+      setProfile(current => recordShoe(current));
       await new Promise(r => setTimeout(r, 2000));
       shoeRef.current.buildAndShuffle();
     }
@@ -1281,8 +1320,56 @@ export default function App() {
         `Shuffle count check: called ${guess}, actual ${drill.actual} (off by ${difference}).`,
         { difference, guess, runningCount: drill.actual, trueCount: drill.trueCount },
       );
+      setProfile(current => recordDrill(current, difference));
     }
     deal(drill.bets, { skipBetWarning: true, skipCountDrill: true });
+  };
+
+  // Lifetime profile: fold session deltas in as they happen.
+  useEffect(() => {
+    const previous = profileDeltaRef.current;
+    if (previous.decisions === null) {
+      profileDeltaRef.current = { decisions: strategyDecisions, hands: sessionHands.length, mistakes: strategyMistakes };
+      return;
+    }
+    const decisionDelta = strategyDecisions - previous.decisions;
+    const mistakeDelta = strategyMistakes - previous.mistakes;
+    const newHands = sessionHands.slice(previous.hands);
+    profileDeltaRef.current = { decisions: strategyDecisions, hands: sessionHands.length, mistakes: strategyMistakes };
+    if (decisionDelta > 0 || newHands.length > 0) {
+      setProfile((current) => {
+        let next = current;
+        if (decisionDelta > 0) next = recordDecisions(next, { decisions: decisionDelta, mistakes: Math.max(0, mistakeDelta) });
+        if (newHands.length > 0) {
+          next = recordHands(next, newHands);
+          if (aiSeatCount === 4 && tablePace === 'pro') next = recordFullTableCasinoRound(next);
+        }
+        return next;
+      });
+    }
+  }, [strategyDecisions, strategyMistakes, sessionHands, aiSeatCount, tablePace]);
+
+  useEffect(() => {
+    saveProfile(profile);
+  }, [profile]);
+
+  const resetSession = () => {
+    if (!['betting', 'resolved'].includes(gameState)) return;
+    setProfile(current => startNewSession(recordSessionPnl(current, sessionPnl)));
+    setBankroll(STARTING_BANKROLL);
+    setTotalBuyIns(0);
+    setSessionHands([]);
+    setStrategyDecisions(0);
+    setStrategyMistakes(0);
+    setCountDrillStats({ attempts: 0, exact: 0 });
+    setPlayerSpots([]);
+    setDealerHand([]);
+    syncAiPlayers([]);
+    shoeRef.current.buildAndShuffle();
+    loggerRef.current = new GameLogger();
+    setGameState('betting');
+    setShowSettings(false);
+    announce('New session. Bankroll reset to one thousand dollars, fresh shoe.', { listenAfter: true });
   };
 
   // Persist the session so a refresh keeps the bankroll, history, and settings.
@@ -1592,11 +1679,11 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const renderChipStack = (amount, outcome, small = false) => {
-    let remaining = amount;
+  const renderChipStack = (amount, outcome, small = false, onChipClick = null) => {
+    let remaining = Math.round(amount * 2) / 2;
     const chips = [];
-    [1000, 500, 100, 25, 5].forEach(d => {
-      while (remaining >= d) { chips.push(d); remaining -= d; }
+    [1000, 500, 100, 25, 5, 2.5].forEach(d => {
+      while (remaining >= d - 1e-9) { chips.push(d); remaining -= d; }
     });
 
     let glowClass = '';
@@ -1604,36 +1691,36 @@ export default function App() {
     else if (outcome === 'loss') glowClass = 'chip-glow-red';
 
     const chipSize = small ? 26 : 36;
-    const chipLift = small ? 9 : 13;
+    const chipLift = small ? 4 : 5;
+    const stackHeight = chipSize + Math.max(0, chips.length - 1) * chipLift;
 
     return (
-      <div className={`chip-stack-container ${glowClass}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2px', borderRadius: '50px', transition: 'all 0.4s ease' }}>
-        {chips.map((c, idx) => (
-          <div className="chip-token" key={idx} style={{
-            width: `${chipSize}px`, height: `${chipSize}px`, borderRadius: '50%', background: getChipColor(c),
-            border: '2px dashed #fff', boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: small ? '0.56rem' : '0.7rem', fontWeight: 'bold', color: '#fff',
-            transform: `translateY(-${idx * chipLift}px)`, zIndex: idx,
-            animationDelay: `${idx * 35}ms`,
-          }}>${c >= 1000 ? `${c / 1000}K` : c}</div>
-        ))}
-        <div style={{ fontSize: small ? '0.62rem' : '0.8rem', fontWeight: '600', color: '#f1c40f', marginTop: `-${Math.max(0, chips.length - 1) * chipLift}px` }}>${amount}</div>
+      <div className={`chip-stack-container ${glowClass}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', transition: 'all 0.4s ease' }}>
+        <div style={{ position: 'relative', width: `${chipSize}px`, height: `${stackHeight}px` }}>
+          {chips.map((c, idx) => (
+            <div
+              className={`chip-token ${onChipClick ? 'is-removable' : ''}`}
+              key={idx}
+              role={onChipClick ? 'button' : undefined}
+              tabIndex={onChipClick ? 0 : undefined}
+              aria-label={onChipClick ? `Remove $${c} chip from bet` : undefined}
+              onClick={onChipClick ? () => onChipClick(c) : undefined}
+              onKeyDown={onChipClick ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onChipClick(c); } } : undefined}
+              style={{
+                position: 'absolute', left: 0, bottom: `${idx * chipLift}px`,
+                width: `${chipSize}px`, height: `${chipSize}px`, borderRadius: '50%', background: getChipColor(c),
+                border: '2px dashed #fff', boxShadow: '0 3px 5px rgba(0,0,0,0.45), inset 0 -2px 3px rgba(0,0,0,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: small ? '0.56rem' : '0.7rem', fontWeight: 'bold', color: '#fff',
+                textShadow: '0 1px 1px rgba(0,0,0,0.6)',
+                zIndex: idx, animationDelay: `${idx * 35}ms`, cursor: onChipClick ? 'pointer' : 'default',
+              }}
+            >${c >= 1000 ? `${c / 1000}K` : c}</div>
+          ))}
+        </div>
+        <div style={{ fontSize: small ? '0.62rem' : '0.8rem', fontWeight: '600', color: '#f1c40f' }}>${amount}</div>
       </div>
     );
-  };
-
-  // Casino deal order: first base (Lena) → ... → you → ... → dealer, twice.
-  const dealOrder = [
-    ...aiPlayers.filter(seat => seat.position === 'pre').map(seat => `seat:${seat.name}`),
-    ...playerSpots.map((_, spotIndex) => `spot:${spotIndex}`),
-    ...aiPlayers.filter(seat => seat.position === 'post').map(seat => `seat:${seat.name}`),
-    'dealer',
-  ];
-  const getDealDelay = (seatKey, cardIndex) => {
-    if (cardIndex > 1) return 0;
-    const seatIndex = Math.max(0, dealOrder.indexOf(seatKey));
-    return (cardIndex * dealOrder.length + seatIndex) * DEAL_STEP_MS;
   };
 
   const renderAiSeat = (seat) => {
@@ -1684,6 +1771,10 @@ export default function App() {
     buyIns: totalBuyIns,
     unresolvedWager: unresolvedHandWager + unresolvedInsuranceWager,
   });
+
+  useEffect(() => {
+    if (sessionPnl > 0) setProfile(current => recordSessionPnl(current, sessionPnl));
+  }, [sessionPnl]);
 
   return (
     <main className="app-shell" style={{
@@ -1821,6 +1912,15 @@ export default function App() {
           rules={rules}
           onRulesChange={changes => setRules(current => normalizeRules({ ...current, ...changes }))}
           rulesLocked={!['betting', 'resolved'].includes(gameState)}
+          profile={profile}
+          sessionStatus={{
+            accuracyRate,
+            bankroll,
+            buyIns: totalBuyIns,
+            hands: sessionHands.length,
+            pnl: sessionPnl,
+          }}
+          onResetSession={resetSession}
         />
       )}
 
@@ -1867,6 +1967,8 @@ export default function App() {
           accuracyRate={accuracyRate}
           reloadOpen={showReload}
           onToggleReload={() => setShowReload(current => !current)}
+          sessionOpen={showSession}
+          onToggleSession={() => setShowSession(current => !current)}
         />
         <div className="header-actions">
           <button
@@ -1940,12 +2042,17 @@ export default function App() {
         </div>
       )}
 
-      {showReload && (
-        <div className="popover-scrim" onClick={() => setShowReload(false)} aria-hidden="true" />
+      {(showReload || showSession) && (
+        <div
+          className="popover-scrim"
+          onClick={() => { setShowReload(false); setShowSession(false); }}
+          aria-hidden="true"
+        />
       )}
-      {showReload && (
+      {(showReload || showSession) && (
         <section className="session-panel" aria-label="Session analytics and bankroll reload">
-          <SessionChart hands={sessionHands} />
+          {showSession && <SessionChart hands={sessionHands} />}
+          {showReload && (
           <div className="reload-panel">
             <div className="reload-copy">
               <span className="eyebrow">Buy in</span>
@@ -1973,6 +2080,7 @@ export default function App() {
             </label>
             <button className="reload-confirm" onClick={() => addToBankroll()}>Add funds</button>
           </div>
+          )}
         </section>
       )}
 
@@ -1994,6 +2102,14 @@ export default function App() {
           remainingFraction={shoeRef.current.cards.length / shoeRef.current.totalCards}
           cutFraction={shoeRef.current.cutCardPosition / shoeRef.current.totalCards}
           decksRemaining={shoeRef.current.decksRemaining}
+        />
+        <ChipRack
+          amount={gameState === 'betting'
+            ? Math.max(0, bankroll - spotBets.slice(0, numHands).reduce((sum, bet) => sum + bet, 0))
+            : bankroll}
+          canBet={gameState === 'betting'}
+          onDropChip={addChipToBet}
+          onTapChip={denomination => addChipToBet(denomination, 0)}
         />
         <svg className="table-rule-arc" viewBox="0 0 900 170" aria-hidden="true">
           <defs>
@@ -2081,9 +2197,9 @@ export default function App() {
                     {getAiSeatsForCount(aiSeatCount).filter(seat => seat.position === 'post').reverse().map(renderIdleSeat)}
                     {Array.from({ length: numHands }, (_, spotIndex) => (
                       <div className="user-seat" key={spotIndex}>
-                        <div className="bet-circle">
-                          {isValidTableWager(spotBets[spotIndex])
-                            ? renderChipStack(spotBets[spotIndex])
+                        <div className="bet-circle is-live" data-bet-target={spotIndex}>
+                          {spotBets[spotIndex] > 0
+                            ? renderChipStack(spotBets[spotIndex], null, false, denomination => removeChipFromBet(denomination, spotIndex))
                             : <span className="bet-circle-hint">BET</span>}
                         </div>
                         <span className="ai-name is-you">You{numHands > 1 ? ` · ${spotIndex + 1}` : ''}</span>

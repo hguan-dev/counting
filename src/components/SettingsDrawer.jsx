@@ -1,10 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DECK_OPTIONS,
   getHouseEdgePercent,
   PAYOUT_OPTIONS,
   PENETRATION_OPTIONS,
 } from '../utils/tableRules';
+import { ACHIEVEMENTS, getRank } from '../utils/profile';
+
+const formatSigned = value => `${value >= 0 ? '+' : '−'}$${Math.abs(Math.round(value)).toLocaleString()}`;
 
 function SettingRow({ label, description, checked, onChange }) {
   return (
@@ -47,6 +50,9 @@ export default function SettingsDrawer({
   rules,
   onRulesChange,
   rulesLocked = false,
+  profile,
+  sessionStatus,
+  onResetSession,
   soundEnabled,
   onSoundChange,
   speechEnabled,
@@ -67,6 +73,13 @@ export default function SettingsDrawer({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
+  const [confirmReset, setConfirmReset] = useState(false);
+  const rank = getRank(profile?.xp || 0);
+  const lifetimeAccuracy = profile?.decisions
+    ? Math.round(((profile.decisions - profile.mistakes) / profile.decisions) * 100)
+    : 0;
+  const unlocked = ACHIEVEMENTS.filter(achievement => achievement.unlocked(profile || {}));
+
   const voiceStatusLabel = voiceModelStatus === 'loading'
     ? `Loading voice model ${voiceModelProgress ? `· ${voiceModelProgress}%` : '…'}`
     : voiceModelStatus === 'warming'
@@ -83,6 +96,69 @@ export default function SettingsDrawer({
         </div>
 
         <div className="settings-content">
+          <section className="profile-section">
+            <div className="profile-rank">
+              <div className="profile-badge" aria-hidden="true">{rank.level}</div>
+              <div className="profile-rank-copy">
+                <span>Rank {rank.level} of 8</span>
+                <strong>{rank.current.title}</strong>
+                <div className="profile-xp" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(rank.progress * 100)}>
+                  <i style={{ width: `${Math.round(rank.progress * 100)}%` }} />
+                </div>
+                <small>
+                  {rank.next
+                    ? `${(profile?.xp || 0).toLocaleString()} XP · ${(rank.next.minXp - (profile?.xp || 0)).toLocaleString()} to ${rank.next.title}`
+                    : `${(profile?.xp || 0).toLocaleString()} XP · top rank`}
+                </small>
+              </div>
+            </div>
+            <div className="profile-stats">
+              <div><span>Hands</span><strong>{(profile?.handsPlayed || 0).toLocaleString()}</strong></div>
+              <div><span>Accuracy</span><strong>{lifetimeAccuracy}%</strong></div>
+              <div><span>Best streak</span><strong>{profile?.bestStreak || 0}</strong></div>
+              <div><span>Count calls</span><strong>{profile?.drillExact || 0}/{profile?.drillAttempts || 0}</strong></div>
+              <div><span>Shoes</span><strong>{profile?.shoesCompleted || 0}</strong></div>
+              <div><span>Best session</span><strong>{formatSigned(profile?.bestSessionPnl || 0)}</strong></div>
+            </div>
+            <div className="profile-achievements" aria-label={`${unlocked.length} of ${ACHIEVEMENTS.length} achievements unlocked`}>
+              {ACHIEVEMENTS.map((achievement) => {
+                const done = achievement.unlocked(profile || {});
+                return (
+                  <div key={achievement.id} className={`achievement ${done ? 'is-unlocked' : ''}`} title={achievement.description}>
+                    <i aria-hidden="true">{done ? '★' : '☆'}</i>
+                    <span>{achievement.title}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <h3>Session</h3>
+            <div className="profile-stats is-session">
+              <div><span>Bankroll</span><strong>${Math.round(sessionStatus?.bankroll || 0).toLocaleString()}</strong></div>
+              <div><span>P&amp;L</span><strong className={(sessionStatus?.pnl || 0) >= 0 ? 'is-positive' : 'is-negative'}>{formatSigned(sessionStatus?.pnl || 0)}</strong></div>
+              <div><span>Hands</span><strong>{sessionStatus?.hands || 0}</strong></div>
+              <div><span>Accuracy</span><strong>{sessionStatus?.accuracyRate || 0}%</strong></div>
+              <div><span>Buy-ins</span><strong>${Math.round(sessionStatus?.buyIns || 0).toLocaleString()}</strong></div>
+              <div><span>Session #</span><strong>{profile?.sessions || 1}</strong></div>
+            </div>
+            {!confirmReset ? (
+              <button className="settings-export is-danger" onClick={() => setConfirmReset(true)} disabled={rulesLocked}>
+                Reset session
+              </button>
+            ) : (
+              <div className="reset-confirm">
+                <span>Bankroll back to $1,000, history cleared, fresh shoe. Your rank and lifetime stats stay.</span>
+                <div>
+                  <button className="settings-export is-danger" onClick={() => { setConfirmReset(false); onResetSession(); }}>Yes, reset</button>
+                  <button className="settings-export" onClick={() => setConfirmReset(false)}>Keep playing</button>
+                </div>
+              </div>
+            )}
+            {rulesLocked && <p className="settings-note">Finish the current round to reset.</p>}
+          </section>
+
           <section>
             <h3>Coaching</h3>
             <SettingRow
@@ -294,7 +370,7 @@ export default function SettingsDrawer({
           </section>
 
           <section>
-            <h3>Session</h3>
+            <h3>Log</h3>
             <button className="settings-export" onClick={onExportLog}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4" />

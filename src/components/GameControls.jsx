@@ -50,8 +50,8 @@ export default function GameControls({
                   type="number"
                   value={spotBets[spotIndex]}
                   onChange={(event) => setSpotBet(spotIndex, Number(event.target.value))}
-                  step="25"
-                  min="25"
+                  step="5"
+                  min="5"
                   max="10000"
                 />
               </span>
