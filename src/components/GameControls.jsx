@@ -21,23 +21,33 @@ export default function GameControls({
   onInsurance,
   onNextRound,
   actionEvs = null,
+  activeBet = 0,
 }) {
   const evFor = action => (actionEvs?.evs?.[action] === undefined ? null : actionEvs.evs[action]);
-  const evLabel = (action) => {
-    const value = evFor(action);
-    if (value === null) return null;
-    return `${value >= 0 ? '+' : '−'}${Math.abs(value * 100).toFixed(1)}%`;
-  };
+  const bestEv = actionEvs?.best ? actionEvs.evs[actionEvs.best] : null;
+  const money = value => `${value < 0 ? '−' : '+'}$${Math.abs(value * activeBet).toFixed(activeBet * Math.abs(value) < 10 ? 2 : 0)}`;
   const isBest = action => actionEvs?.best === action;
   const actionSub = (action) => {
-    const ev = evLabel(action);
+    const value = evFor(action);
     const hinted = hintedAction === action;
-    if (!ev && !hinted) return null;
+    if (value === null && !hinted) return null;
+    if (value === null) return <small className="action-sub">Recommended</small>;
+    const gap = bestEv !== null && !isBest(action) ? bestEv - value : 0;
     return (
       <small className={`action-sub ${isBest(action) ? 'is-best' : ''}`}>
-        {hinted ? 'Recommended' : ''}{hinted && ev ? ' · ' : ''}{ev ? `EV ${ev}` : ''}
+        {hinted ? 'Recommended · ' : ''}
+        {activeBet > 0 ? money(value) : `${value >= 0 ? '+' : '−'}${Math.abs(value * 100).toFixed(1)}%`}
+        {isBest(action) ? ' · best' : gap > 0.0005 ? ` · ${(gap * 100).toFixed(1)} pts worse` : ''}
       </small>
     );
+  };
+  const evCaption = () => {
+    if (!actionEvs || bestEv === null) return null;
+    const bestName = { double: 'Doubling', hit: 'Hitting', split: 'Splitting', stand: 'Standing', surrender: 'Surrendering' }[actionEvs.best] || actionEvs.best;
+    if (bestEv < 0) {
+      return `Every option loses on average here — ${bestName.toLowerCase()} loses least (${(bestEv * 100).toFixed(1)}% of your bet).`;
+    }
+    return `${bestName} is a favourite here: about ${(bestEv * 100).toFixed(1)}% of your bet on average.`;
   };
   return (
     <div className={`game-controls is-${gameState}`} aria-label="Game controls">
@@ -98,8 +108,11 @@ export default function GameControls({
 
       {gameState === 'playing' && actionEvs && (
         <div className="ev-caption" aria-live="polite">
-          <span>Count-adjusted EV per unit bet</span>
-          <b>Dealer busts {Math.round(actionEvs.dealerBust * 100)}%</b>
+          <div className="ev-caption-row">
+            <span>Expected result per hand at this count{activeBet ? ` on your $${activeBet}` : ''}</span>
+            <b>Dealer busts {Math.round(actionEvs.dealerBust * 100)}%</b>
+          </div>
+          <p>{evCaption()}</p>
         </div>
       )}
 

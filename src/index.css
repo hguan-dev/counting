@@ -4566,13 +4566,16 @@ button:disabled {
 
 /* ---- Action EVs ---- */
 .ev-caption {
-  display: flex;
   margin-bottom: 0.45rem;
+  color: var(--muted);
+}
+
+.ev-caption-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  color: var(--muted);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4580,6 +4583,13 @@ button:disabled {
 
 .ev-caption b {
   color: var(--gold-soft);
+}
+
+.ev-caption p {
+  margin: 0.25rem 0 0;
+  color: rgba(247, 245, 237, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .action-sub {

@@ -2391,6 +2391,7 @@ export default function App() {
           onInsurance={executeInsurance}
           onNextRound={beginNextRound}
           actionEvs={actionEvs}
+          activeBet={activeHandForEv?.bet || 0}
         />
       )}
     </main>
