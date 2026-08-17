@@ -179,6 +179,9 @@ export default function App() {
   const [showStrategyPopups, setShowStrategyPopups] = useState(() => (
     typeof restored?.showStrategyPopups === 'boolean' ? restored.showStrategyPopups : true
   ));
+  const [warnBetSizing, setWarnBetSizing] = useState(() => (
+    typeof restored?.warnBetSizing === 'boolean' ? restored.warnBetSizing : false
+  ));
   const [pendingAction, setPendingAction] = useState(null);
 
   const {
@@ -420,7 +423,7 @@ export default function App() {
     const sizingTrueCount = shoeRef.current.needsShuffle() ? 0 : shoeRef.current.trueCount;
     const recommendedWager = Math.max(BET_UNIT, getSpreadBet(betSpread, sizingTrueCount));
     const hasSizingMistake = activeBets.some(bet => bet !== recommendedWager);
-    if (warnStrategy && !skipBetWarning) {
+    if (warnBetSizing && !skipBetWarning) {
       if (hasSizingMistake && showStrategyPopups) {
         setStrategyDecisions(current => current + 1);
         setStrategyMistakes(current => current + 1);
@@ -1302,12 +1305,13 @@ export default function App() {
       strategyMistakes,
       tablePace,
       totalBuyIns,
+      warnBetSizing,
       warnStrategy,
     });
   }, [
     aiSeatCount, bankroll, betSpread, countDrillEnabled, countDrillStats, numHands, playerSpots,
     reloadAmount, rules, sessionHands, showStrategyPopups, spotBets,
-    strategyDecisions, strategyMistakes, tablePace, totalBuyIns, warnStrategy,
+    strategyDecisions, strategyMistakes, tablePace, totalBuyIns, warnBetSizing, warnStrategy,
   ]);
 
   const triggerCelebration = () => {
@@ -1792,6 +1796,8 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           warnStrategy={warnStrategy}
           onWarnStrategyChange={setWarnStrategy}
+          warnBetSizing={warnBetSizing}
+          onWarnBetSizingChange={setWarnBetSizing}
           showStrategyPopups={showStrategyPopups}
           onStrategyPopupsChange={setShowStrategyPopups}
           soundEnabled={soundEnabled}

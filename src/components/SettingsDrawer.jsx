@@ -33,6 +33,8 @@ export default function SettingsDrawer({
   onClose,
   warnStrategy,
   onWarnStrategyChange,
+  warnBetSizing = false,
+  onWarnBetSizingChange,
   showStrategyPopups,
   onStrategyPopupsChange,
   tablePace,
@@ -88,6 +90,12 @@ export default function SettingsDrawer({
               description="Checks every play against basic strategy before it happens."
               checked={warnStrategy}
               onChange={() => onWarnStrategyChange(!warnStrategy)}
+            />
+            <SettingRow
+              label="Bet-sizing guard"
+              description="Warn before the deal when your wager doesn't match your bet spread for the count."
+              checked={warnBetSizing}
+              onChange={() => onWarnBetSizingChange(!warnBetSizing)}
             />
             <SettingRow
               label="Correction popups"
