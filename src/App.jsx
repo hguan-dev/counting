@@ -29,7 +29,9 @@ import {
   getSpokenHandTotal,
 } from './utils/tableSpeech';
 import { getKeyboardCommand } from './utils/keyboardShortcuts';
-import { getRecommendedWager, isValidTableWager } from './utils/betSizing';
+import { BET_UNIT, isValidTableWager } from './utils/betSizing';
+import { DEFAULT_RULES, normalizeRules } from './utils/tableRules';
+import { getSpreadBet, normalizeBetSpread } from './utils/betSpread';
 import {
   calculateRealizedPnl,
   getUnresolvedHandWager,
@@ -48,6 +50,7 @@ const AI_SEAT_ROSTER = [
   { name: 'Walt', position: 'post' },
 ];
 const AI_BET_OPTIONS = [25, 25, 50, 50, 75, 100];
+const DEAL_STEP_MS = 150;
 
 const getAiSeatsForCount = (count) => (
   count === 2
@@ -95,13 +98,19 @@ const SICK_REACTION_PARTICLES = Array.from({ length: 150 }, (_, index) => ({
 const formatCards = cards => cards.map(card => `${card.value}${card.suit}`).join(' ');
 
 export default function App() {
-  const shoeRef = useRef(new Shoe(6));
+  const shoeRef = useRef(null);
+  if (!shoeRef.current) {
+    const initialRules = normalizeRules(loadSessionState()?.rules ?? DEFAULT_RULES);
+    shoeRef.current = new Shoe(initialRules.decks, initialRules.penetration);
+  }
   const loggerRef = useRef(new GameLogger());
   const handleActionRef = useRef(null);
   const keyboardActionRef = useRef(null);
   const voiceCommandRef = useRef(null);
   
   const [restored] = useState(loadSessionState);
+  const [rules, setRules] = useState(() => normalizeRules(restored?.rules));
+  const [betSpread, setBetSpread] = useState(() => normalizeBetSpread(restored?.betSpread));
   const [bankroll, setBankroll] = useState(() => (
     Number.isFinite(restored?.bankroll) && restored.bankroll >= 0 ? restored.bankroll : STARTING_BANKROLL
   ));
@@ -191,7 +200,7 @@ export default function App() {
     voiceStatus,
     voiceSupported,
   } = useTableVoice({
-    isListeningAllowed: !['dealerRevealing', 'shuffling', 'aiPlaying'].includes(gameState),
+    isListeningAllowed: !['dealerRevealing', 'shuffling', 'aiPlaying', 'dealing'].includes(gameState),
     onCommand: command => voiceCommandRef.current?.(command),
   });
 
@@ -212,7 +221,7 @@ export default function App() {
   // Companions play plain basic strategy — no deviations, no surrender, and
   // pairs are played as hard totals to keep single-hand seats.
   const getAiDecision = (cards, dealerUpCard) => {
-    const evaluation = getDetailedPlay(cards, dealerUpCard, 0, { allowSurrender: false });
+    const evaluation = getDetailedPlay(cards, dealerUpCard, 0, { allowSurrender: false, ignoreDeviations: true, rules });
     let action = evaluation.action;
     if (action === 'split') {
       const total = calculateTotal(cards);
@@ -327,7 +336,7 @@ export default function App() {
         if (hand.outcome === 'surrender') returnAmount = hand.bet / 2;
         if (hand.outcome === 'win') {
           returnAmount = isNaturalBlackjack(hand) && !hand.evenMoneyAccepted
-            ? hand.bet * 2.5
+            ? hand.bet * (1 + rules.blackjackPayout)
             : hand.bet * 2;
         }
         const insuranceBet = handIndex === spot.subHands.length - 1
@@ -403,8 +412,12 @@ export default function App() {
       return;
     }
 
+    if (shoeRef.current.configure(rules.decks, rules.penetration)) {
+      loggerRef.current.log('SHUFFLE', `Table rules changed: new ${rules.decks}-deck shoe.`);
+    }
+
     const sizingTrueCount = shoeRef.current.needsShuffle() ? 0 : shoeRef.current.trueCount;
-    const recommendedWager = getRecommendedWager(sizingTrueCount);
+    const recommendedWager = Math.max(BET_UNIT, getSpreadBet(betSpread, sizingTrueCount));
     const hasSizingMistake = activeBets.some(bet => bet !== recommendedWager);
     if (warnStrategy && !skipBetWarning) {
       if (hasSizingMistake && showStrategyPopups) {
@@ -417,7 +430,7 @@ export default function App() {
           optimal: `$${recommendedWager} per spot`,
           recommendedWager,
           revealHint: true,
-          rule: `At true count ${sizingTrueCount >= 0 ? '+' : ''}${sizingTrueCount}, this trainer's $25-unit ramp calls for $${recommendedWager} on each active spot.`,
+          rule: `At true count ${sizingTrueCount >= 0 ? '+' : ''}${sizingTrueCount}, your bet spread calls for $${recommendedWager} on each active spot. Edit the spread in the Study Guide → Bet spread.`,
           type: 'betSizing',
         });
         announce(
@@ -507,6 +520,12 @@ export default function App() {
       },
     );
 
+    // Let the dealer pitch the cards around the table before any decisions.
+    setPlayerSpots(spots);
+    setGameState('dealing');
+    const seatsInDeal = aiSeats.length + numHands + 1;
+    await new Promise(r => setTimeout(r, seatsInDeal * 2 * DEAL_STEP_MS + 260));
+
     const d1Val = d1.value;
     const isDealerTenOrFace = d1.numericValue === 10;
     const isDealerAce = d1Val === 'A';
@@ -564,8 +583,8 @@ export default function App() {
 
       if (isBJ) {
         h.outcome = 'win';
-        payoutReturn += h.bet + (h.bet * 1.5);
-        loggerRef.current.log('BLACKJACK', `Spot ${sIdx+1} natural Blackjack for +$${h.bet * 1.5}`);
+        payoutReturn += h.bet + (h.bet * rules.blackjackPayout);
+        loggerRef.current.log('BLACKJACK', `Spot ${sIdx+1} natural Blackjack for +$${h.bet * rules.blackjackPayout}`);
         h.status = 'stood';
       }
     });
@@ -682,7 +701,7 @@ export default function App() {
       spots.forEach((spot) => {
         spot.subHands.forEach((hand) => {
           hand.outcome = 'loss';
-          const settlement = getNaturalBlackjackSettlement(hand, true);
+          const settlement = getNaturalBlackjackSettlement(hand, true, rules.blackjackPayout);
           if (settlement) {
             hand.outcome = settlement.outcome;
             hand.status = 'stood';
@@ -701,7 +720,7 @@ export default function App() {
       let winnings = 0;
       spots.forEach((spot) => {
         spot.subHands.forEach(h => {
-          const settlement = getNaturalBlackjackSettlement(h, false);
+          const settlement = getNaturalBlackjackSettlement(h, false, rules.blackjackPayout);
           if (settlement) {
             h.outcome = settlement.outcome;
             winnings += settlement.returnAmount;
@@ -942,7 +961,7 @@ export default function App() {
     ))) || aiPlayersRef.current.some(seat => calculateTotal(seat.cards) <= 21);
 
     if (needsDealerDraw && !dealerHasBlackjack) {
-      while (calculateTotal(dHand) < 17 || isSoft17(dHand)) {
+      while (calculateTotal(dHand) < 17 || (rules.dealerHitsSoft17 && isSoft17(dHand))) {
         await new Promise(r => setTimeout(r, 550));
         const drawnCard = shoeRef.current.draw();
         playSound('card');
@@ -1051,7 +1070,8 @@ export default function App() {
       dealerHand[0],
       shoeRef.current.trueCount,
       {
-        allowSurrender: canSurrenderHand(curHand),
+        allowSurrender: rules.lateSurrender && canSurrenderHand(curHand),
+        rules,
         runningCount: shoeRef.current.visibleRunningCount,
       },
     );
@@ -1128,7 +1148,8 @@ export default function App() {
       dealerHand[0],
       shoeRef.current.trueCount,
       {
-        allowSurrender: canSurrenderHand(hand),
+        allowSurrender: rules.lateSurrender && canSurrenderHand(hand),
+        rules,
         runningCount: shoeRef.current.visibleRunningCount,
       },
     );
@@ -1267,6 +1288,8 @@ export default function App() {
     saveSessionState({
       aiSeatCount,
       bankroll: bankroll + getUnresolvedHandWager(playerSpots),
+      betSpread,
+      rules,
       countDrillEnabled,
       countDrillStats,
       numHands,
@@ -1281,8 +1304,8 @@ export default function App() {
       warnStrategy,
     });
   }, [
-    aiSeatCount, bankroll, countDrillEnabled, countDrillStats, numHands, playerSpots,
-    reloadAmount, sessionHands, showStrategyPopups, spotBets,
+    aiSeatCount, bankroll, betSpread, countDrillEnabled, countDrillStats, numHands, playerSpots,
+    reloadAmount, rules, sessionHands, showStrategyPopups, spotBets,
     strategyDecisions, strategyMistakes, tablePace, totalBuyIns, warnStrategy,
   ]);
 
@@ -1595,6 +1618,19 @@ export default function App() {
     );
   };
 
+  // Casino deal order: first base (Lena) → ... → you → ... → dealer, twice.
+  const dealOrder = [
+    ...aiPlayers.filter(seat => seat.position === 'pre').map(seat => `seat:${seat.name}`),
+    ...playerSpots.map((_, spotIndex) => `spot:${spotIndex}`),
+    ...aiPlayers.filter(seat => seat.position === 'post').map(seat => `seat:${seat.name}`),
+    'dealer',
+  ];
+  const getDealDelay = (seatKey, cardIndex) => {
+    if (cardIndex > 1) return 0;
+    const seatIndex = Math.max(0, dealOrder.indexOf(seatKey));
+    return (cardIndex * dealOrder.length + seatIndex) * DEAL_STEP_MS;
+  };
+
   const renderAiSeat = (seat) => {
     const total = calculateTotal(seat.cards);
     return (
@@ -1605,7 +1641,7 @@ export default function App() {
         <span className="ai-name">{seat.name}</span>
         <div className="ai-cards">
           {seat.cards.map((card, cardIndex) => (
-            <PlayingCard key={cardIndex} card={card} compact delay={cardIndex * 70} />
+            <PlayingCard key={cardIndex} card={card} compact delay={getDealDelay(`seat:${seat.name}`, cardIndex)} />
           ))}
         </div>
         <span className={`ai-total ${total > 21 ? 'is-bust' : ''}`}>
@@ -1627,7 +1663,7 @@ export default function App() {
   const accuracyRate = strategyDecisions > 0
     ? Math.round(((strategyDecisions - strategyMistakes) / strategyDecisions) * 100)
     : 0;
-  const hasOpenRound = ['playing', 'insurance', 'evenMoney', 'dealerRevealing', 'aiPlaying'].includes(gameState);
+  const hasOpenRound = ['playing', 'insurance', 'evenMoney', 'dealerRevealing', 'aiPlaying', 'dealing'].includes(gameState);
   const unresolvedHandWager = hasOpenRound ? getUnresolvedHandWager(playerSpots) : 0;
   const insuranceStillAtRisk = gameState === 'insurance'
     || (
@@ -1739,7 +1775,16 @@ export default function App() {
         </div>
       )}
 
-      {showCheatSheet && <CheatSheet onClose={() => setShowCheatSheet(false)} />}
+      {showCheatSheet && (
+        <CheatSheet
+          onClose={() => setShowCheatSheet(false)}
+          rules={rules}
+          betSpread={betSpread}
+          onBetSpreadChange={setBetSpread}
+          bankroll={bankroll}
+          aiSeatCount={aiSeatCount}
+        />
+      )}
 
       {showSettings && (
         <SettingsDrawer
@@ -1766,6 +1811,9 @@ export default function App() {
           drillStats={countDrillStats}
           aiSeatCount={aiSeatCount}
           onAiSeatCountChange={setAiSeatCount}
+          rules={rules}
+          onRulesChange={changes => setRules(current => normalizeRules({ ...current, ...changes }))}
+          rulesLocked={!['betting', 'resolved'].includes(gameState)}
         />
       )}
 
@@ -1853,9 +1901,9 @@ export default function App() {
             aria-label="Open settings"
             title="Settings"
           >
-            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="3.1" />
-              <path d="M12 2.9v2.5M12 18.6v2.5M2.9 12h2.5M18.6 12h2.5M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" />
+            <svg className="header-action-icon is-gear" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10.3 2.5h3.4l.5 2.6c.6.2 1.2.5 1.7 .9l2.5-.9 1.7 2.9-2 1.7c.1.6.1 1.2 0 1.8l2 1.7-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.7-2.9 2-1.7a6.6 6.6 0 0 1 0-1.8l-2-1.7 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9l.5-2.6Z" />
+              <circle cx="12" cy="12" r="2.6" />
             </svg>
             <span className="sr-only">Settings</span>
           </button>
@@ -1948,10 +1996,10 @@ export default function App() {
             <textPath href="#table-rule-path" startOffset="19%" textAnchor="middle">INSURANCE PAYS 2 TO 1</textPath>
           </text>
           <text className="table-rule-copy table-rule-copy-center" dy="-23">
-            <textPath href="#table-rule-path" startOffset="50%" textAnchor="middle">BLACKJACK PAYS 3 TO 2</textPath>
+            <textPath href="#table-rule-path" startOffset="50%" textAnchor="middle">BLACKJACK PAYS {rules.blackjackPayout === 1.2 ? '6 TO 5' : '3 TO 2'}</textPath>
           </text>
           <text className="table-rule-copy table-rule-copy-right" dy="-13">
-            <textPath href="#table-rule-path" startOffset="81%" textAnchor="middle">DEALER MUST HIT SOFT 17</textPath>
+            <textPath href="#table-rule-path" startOffset="81%" textAnchor="middle">{rules.dealerHitsSoft17 ? 'DEALER MUST HIT SOFT 17' : 'DEALER STANDS ON ALL 17S'}</textPath>
           </text>
         </svg>
         {gameState === 'shuffling' ? (
@@ -1996,7 +2044,7 @@ export default function App() {
               <div className="zone-label">
                 <span>Dealer</span>
                 <strong>
-                  {['playing', 'insurance', 'evenMoney', 'aiPlaying'].includes(gameState)
+                  {['playing', 'insurance', 'evenMoney', 'aiPlaying', 'dealing'].includes(gameState)
                     ? dealerHand.length ? calculateTotal([dealerHand[0]]) : '—'
                     : dealerHand.length > 0 ? calculateTotal(dealerHand) : '—'}
                 </strong>
@@ -2009,8 +2057,8 @@ export default function App() {
                   </div>
                 ) : (
                   dealerHand.map((card, i) => {
-                    const hidden = ['playing', 'insurance', 'evenMoney', 'aiPlaying'].includes(gameState) && i === 1;
-                    return <PlayingCard key={i} card={card} hidden={hidden} delay={i * 90} />;
+                    const hidden = ['playing', 'insurance', 'evenMoney', 'aiPlaying', 'dealing'].includes(gameState) && i === 1;
+                    return <PlayingCard key={i} card={card} hidden={hidden} delay={getDealDelay('dealer', i)} />;
                   })
                 )}
               </div>
@@ -2057,7 +2105,7 @@ export default function App() {
                                         key={cIdx}
                                         card={card}
                                         compact
-                                        delay={cIdx * 70}
+                                        delay={hand.isSplitHand ? cIdx * 90 : getDealDelay(`spot:${sIdx}`, cIdx)}
                                         hidden={isDoubleCard && hand.doubleCardFaceDown}
                                         peel={isDoubleCard && hand.doubleCardPeeling}
                                       />
@@ -2116,9 +2164,9 @@ export default function App() {
           onDouble={() => handleAction('double')}
           onSplit={() => handleAction('split')}
           onSurrender={() => handleAction('surrender')}
-          canDouble={getCurrentActiveHand()?.cards.length === 2}
+          canDouble={getCurrentActiveHand()?.cards.length === 2 && (rules.doubleAfterSplit || !getCurrentActiveHand()?.isSplitHand)}
           canSplit={canSplitCurrent()}
-          canSurrender={canSurrenderHand(getCurrentActiveHand())}
+          canSurrender={rules.lateSurrender && canSurrenderHand(getCurrentActiveHand())}
           canResplit={(playerSpots[activeSpotIndex]?.subHands.length || 0) > 1}
           hintedAction={hintedAction}
           onHint={requestHint}

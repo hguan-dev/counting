@@ -1,4 +1,10 @@
 import { useEffect } from 'react';
+import {
+  DECK_OPTIONS,
+  getHouseEdgePercent,
+  PAYOUT_OPTIONS,
+  PENETRATION_OPTIONS,
+} from '../utils/tableRules';
 
 function SettingRow({ label, description, checked, onChange }) {
   return (
@@ -36,6 +42,9 @@ export default function SettingsDrawer({
   drillStats,
   aiSeatCount,
   onAiSeatCountChange,
+  rules,
+  onRulesChange,
+  rulesLocked = false,
   soundEnabled,
   onSoundChange,
   speechEnabled,
@@ -187,13 +196,92 @@ export default function SettingsDrawer({
 
           <section>
             <h3>Table rules</h3>
+            <p className="settings-note is-lead">
+              House edge for these rules: <strong>{getHouseEdgePercent(rules).toFixed(2)}%</strong>
+              {rulesLocked && ' · changes apply from the next round'}
+            </p>
+            <div className="rule-field">
+              <span>Decks</span>
+              <div className="pace-options is-decks" role="radiogroup" aria-label="Number of decks">
+                {DECK_OPTIONS.map(decks => (
+                  <button
+                    key={decks}
+                    role="radio"
+                    aria-checked={rules.decks === decks}
+                    className={rules.decks === decks ? 'is-selected' : ''}
+                    onClick={() => onRulesChange({ decks })}
+                  >
+                    <span>{decks}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="rule-field">
+              <span>Penetration</span>
+              <div className="pace-options is-pen" role="radiogroup" aria-label="Shoe penetration">
+                {PENETRATION_OPTIONS.map(penetration => (
+                  <button
+                    key={penetration}
+                    role="radio"
+                    aria-checked={rules.penetration === penetration}
+                    className={rules.penetration === penetration ? 'is-selected' : ''}
+                    onClick={() => onRulesChange({ penetration })}
+                  >
+                    <span>{Math.round(penetration * 100)}%</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="rule-field">
+              <span>Dealer on soft 17</span>
+              <div className="pace-options is-pair" role="radiogroup" aria-label="Dealer soft 17 rule">
+                {[[true, 'Hits', 'H17'], [false, 'Stands', 'S17']].map(([value, label, detail]) => (
+                  <button
+                    key={detail}
+                    role="radio"
+                    aria-checked={rules.dealerHitsSoft17 === value}
+                    className={rules.dealerHitsSoft17 === value ? 'is-selected' : ''}
+                    onClick={() => onRulesChange({ dealerHitsSoft17: value })}
+                  >
+                    <span>{label}</span>
+                    <small>{detail}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="rule-field">
+              <span>Blackjack pays</span>
+              <div className="pace-options is-pair" role="radiogroup" aria-label="Blackjack payout">
+                {PAYOUT_OPTIONS.map(option => (
+                  <button
+                    key={option.label}
+                    role="radio"
+                    aria-checked={rules.blackjackPayout === option.value}
+                    className={rules.blackjackPayout === option.value ? 'is-selected' : ''}
+                    onClick={() => onRulesChange({ blackjackPayout: option.value })}
+                  >
+                    <span>{option.label}</span>
+                    <small>{option.value === 1.5 ? 'Standard' : 'Avoid'}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <SettingRow
+              label="Double after split (DAS)"
+              description="Double down on hands created by splitting a pair."
+              checked={rules.doubleAfterSplit}
+              onChange={() => onRulesChange({ doubleAfterSplit: !rules.doubleAfterSplit })}
+            />
+            <SettingRow
+              label="Late surrender (LS)"
+              description="Forfeit half the wager after the dealer checks for blackjack."
+              checked={rules.lateSurrender}
+              onChange={() => onRulesChange({ lateSurrender: !rules.lateSurrender })}
+            />
             <ul className="rules-list">
-              <li><span>Shoe</span><strong>6 decks · 75% penetration</strong></li>
-              <li><span>Dealer</span><strong>Hits soft 17</strong></li>
-              <li><span>Blackjack</span><strong>Pays 3:2</strong></li>
               <li><span>Insurance</span><strong>Pays 2:1</strong></li>
               <li><span>Limits</span><strong>$25 – $10,000 · up to 2 spots</strong></li>
-              <li><span>Splits</span><strong>Up to 4 hands per spot</strong></li>
+              <li><span>Splits</span><strong>Up to 4 hands · split Aces get one card</strong></li>
             </ul>
           </section>
 

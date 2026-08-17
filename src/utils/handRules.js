@@ -35,7 +35,7 @@ export const applyEvenMoneyDecision = (spots, offer, accepted) => (
   }))
 );
 
-export const getNaturalBlackjackSettlement = (hand, dealerHasBlackjack) => {
+export const getNaturalBlackjackSettlement = (hand, dealerHasBlackjack, payout = 1.5) => {
   if (!isNaturalBlackjack(hand)) return null;
 
   if (hand.evenMoneyAccepted) {
@@ -46,7 +46,7 @@ export const getNaturalBlackjackSettlement = (hand, dealerHasBlackjack) => {
     return { outcome: 'push', returnAmount: hand.bet };
   }
 
-  return { outcome: 'win', returnAmount: hand.bet * 2.5 };
+  return { outcome: 'win', returnAmount: hand.bet * (1 + payout) };
 };
 
 export const getInsuranceBets = (spots, buy) => (

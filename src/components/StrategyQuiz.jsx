@@ -9,7 +9,7 @@ const SUITS = ['♠', '♥', '♦', '♣'];
 const randomItem = items => items[Math.floor(Math.random() * items.length)];
 const randomCard = value => new Card(randomItem(SUITS), value ?? randomItem(VALUES));
 
-const buildScenario = () => {
+const buildScenario = (rules) => {
   for (;;) {
     const trueCount = Math.floor(Math.random() * 9) - 3;
     const dealerCard = randomCard();
@@ -25,13 +25,13 @@ const buildScenario = () => {
     }
     if (calculateTotal(cards) === 21) continue;
 
-    const evaluation = getDetailedPlay(cards, dealerCard, trueCount);
+    const evaluation = getDetailedPlay(cards, dealerCard, trueCount, { rules });
     return { cards, dealerCard, evaluation, trueCount };
   }
 };
 
-export default function StrategyQuiz() {
-  const [scenario, setScenario] = useState(buildScenario);
+export default function StrategyQuiz({ rules }) {
+  const [scenario, setScenario] = useState(() => buildScenario(rules));
   const [answer, setAnswer] = useState(null);
   const [streak, setStreak] = useState(0);
   const [score, setScore] = useState({ correct: 0, total: 0 });
@@ -47,7 +47,7 @@ export default function StrategyQuiz() {
     ['stand', 'Stand'],
     ['double', 'Double'],
     ...(isPair ? [['split', 'Split']] : []),
-    ['surrender', 'Surrender'],
+    ...(rules?.lateSurrender === false ? [] : [['surrender', 'Surrender']]),
   ];
 
   const choose = (action) => {
@@ -62,7 +62,7 @@ export default function StrategyQuiz() {
   };
 
   const nextHand = () => {
-    setScenario(buildScenario());
+    setScenario(buildScenario(rules));
     setAnswer(null);
   };
 
@@ -80,7 +80,7 @@ export default function StrategyQuiz() {
         <div className="quiz-row">
           <span className="quiz-row-label">Dealer shows</span>
           <div className="quiz-cards">
-            <PlayingCard card={dealerCard} compact />
+            <PlayingCard card={dealerCard} compact animateDeal={false} />
           </div>
         </div>
         <div className="quiz-row">
@@ -89,7 +89,7 @@ export default function StrategyQuiz() {
           </span>
           <div className="quiz-cards">
             {cards.map((card, index) => (
-              <PlayingCard key={`${card.value}${card.suit}${index}`} card={card} compact />
+              <PlayingCard key={`${card.value}${card.suit}${index}`} card={card} compact animateDeal={false} />
             ))}
           </div>
         </div>

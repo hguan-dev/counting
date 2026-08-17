@@ -1,39 +1,9 @@
 import { useState } from 'react';
 import StrategyQuiz from './StrategyQuiz';
-import { BET_RAMP_GUIDE_ROWS } from '../utils/betSizing';
+import StrategyChart from './StrategyChart';
+import BetSpreadLab from './BetSpreadLab';
 import { DEVIATION_GUIDE_GROUPS } from '../utils/deviations';
-
-const strategyRows = [
-  ['Hard 17+', 'Stand'],
-  ['Hard 13–16', 'Stand vs 2–6; hit vs 7–A'],
-  ['Hard 12', 'Stand vs 4–6; otherwise hit'],
-  ['Hard 11', 'Double; hit if doubling unavailable'],
-  ['Hard 10', 'Double vs 2–9; otherwise hit'],
-  ['Hard 9', 'Double vs 3–6; otherwise hit'],
-  ['Soft 20+', 'Stand'],
-  ['Soft 19 (A,8)', 'Double vs 6; otherwise stand'],
-  ['Soft 18 (A,7)', 'Double vs 2–6; stand vs 7,8; hit vs 9–A'],
-  ['Soft 13–17', 'Double against select 3–6 upcards; otherwise hit'],
-];
-
-const pairRows = [
-  ['A,A', 'Always split'],
-  ['8,8', 'Always split except surrender vs Ace'],
-  ['10,10', 'Never split; stand'],
-  ['9,9', 'Split vs 2–6, 8, 9'],
-  ['7,7', 'Split vs 2–7'],
-  ['6,6', 'Split vs 2–6'],
-  ['5,5', 'Never split; play as hard 10'],
-  ['4,4', 'Split vs 5–6'],
-  ['2,2 / 3,3', 'Split vs 2–7'],
-];
-
-const surrenderRows = [
-  ['Hard 15', 'Surrender vs 10 at RC 0+; vs Ace at TC −1+'],
-  ['Hard 16 (not 8,8)', 'Surrender vs 9, 10, or Ace; use negative-count exceptions below'],
-  ['Hard 17', 'Surrender vs Ace'],
-  ['8,8', 'Surrender vs Ace; split against other upcards'],
-];
+import { describeRules } from '../utils/tableRules';
 
 const countRows = [
   ['2–6', '+1', 'Low cards leaving the shoe favor the player'],
@@ -60,13 +30,22 @@ function GuideTable({ rows, headings }) {
   );
 }
 
-export default function CheatSheet({ onClose }) {
-  const [activeTab, setActiveTab] = useState('strategy');
+export default function CheatSheet({
+  onClose,
+  rules,
+  betSpread,
+  onBetSpreadChange,
+  bankroll,
+  aiSeatCount,
+  initialTab = 'strategy',
+}) {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const tabs = [
     ['strategy', 'Strategy'],
-    ['rules', 'How to play'],
+    ['spread', 'Bet spread'],
     ['counting', 'Counting'],
     ['quiz', 'Quiz'],
+    ['rules', 'How to play'],
   ];
 
   return (
@@ -99,31 +78,16 @@ export default function CheatSheet({ onClose }) {
             <section className="guide-callout">
               <span className="guide-callout-icon">★</span>
               <div>
-                <strong>Basic strategy is math, not instinct.</strong>
-                <p>It minimizes the house edge for the exact rules shown at the table. It does not guarantee any single hand.</p>
+                <strong>Basic strategy for this table: {describeRules(rules)}.</strong>
+                <p>These charts are generated from the same engine that grades your play, so they always match the rules in Settings.</p>
               </div>
             </section>
 
-            <section>
-              <h3>Hard & soft totals</h3>
-              <p className="section-intro">A soft hand contains an Ace currently counted as 11. A hard hand does not.</p>
-              <GuideTable rows={strategyRows} headings={['Your hand', 'Best play']} />
-            </section>
+            <StrategyChart rules={rules} />
 
-            <section>
-              <h3>Pairs</h3>
-              <GuideTable rows={pairRows} headings={['Pair', 'Best play']} />
-            </section>
-
-            <section>
-              <h3>Late surrender</h3>
-              <p className="section-intro">Available only on the original two-card hand after the dealer checks for blackjack. You forfeit half your wager and the hand ends.</p>
-              <GuideTable rows={surrenderRows} headings={['Your hand', 'Surrender when']} />
-            </section>
-
-            <details open>
+            <details>
               <summary>Complete Hi-Lo deviation index</summary>
-              <p className="section-intro">Six-deck H17, DAS, late surrender. RC means running count; all other indices use the rounded true count.</p>
+              <p className="section-intro">Six-deck H17, DAS, late surrender indices. RC means running count; all other indices use the rounded true count.</p>
               {DEVIATION_GUIDE_GROUPS.map(group => (
                 <div className="deviation-group" key={group.title}>
                   <h4>{group.title}</h4>
@@ -131,6 +95,25 @@ export default function CheatSheet({ onClose }) {
                 </div>
               ))}
             </details>
+          </>
+        )}
+
+        {activeTab === 'spread' && (
+          <>
+            <section className="guide-callout">
+              <span className="guide-callout-icon">$</span>
+              <div>
+                <strong>Size bets from the count, sized to your bankroll.</strong>
+                <p>Enter a bet for each true count or build one from the rules. Hourly EV, variance, and risk of ruin update live.</p>
+              </div>
+            </section>
+            <BetSpreadLab
+              rules={rules}
+              spread={betSpread}
+              onSpreadChange={onBetSpreadChange}
+              bankroll={bankroll}
+              aiSeatCount={aiSeatCount}
+            />
           </>
         )}
 
@@ -170,13 +153,13 @@ export default function CheatSheet({ onClose }) {
             <details open>
               <summary>Rules used by this table</summary>
               <ul className="guide-list">
-                <li>Six-deck shoe with roughly 75% penetration.</li>
-                <li>Dealer hits soft 17 (H17).</li>
-                <li>Blackjack pays 3:2.</li>
-                <li>Double after split is allowed.</li>
-                <li>Pairs may be resplit to a maximum of four hands.</li>
-                <li>Split Aces receive one card each.</li>
-                <li>Late surrender is allowed on an unsplit original two-card hand.</li>
+                <li>{rules.decks}-deck shoe with roughly {Math.round(rules.penetration * 100)}% penetration.</li>
+                <li>Dealer {rules.dealerHitsSoft17 ? 'hits' : 'stands on'} soft 17 ({rules.dealerHitsSoft17 ? 'H17' : 'S17'}).</li>
+                <li>Blackjack pays {rules.blackjackPayout === 1.2 ? '6:5' : '3:2'}.</li>
+                <li>Double after split is {rules.doubleAfterSplit ? 'allowed' : 'not allowed'}.</li>
+                <li>Pairs may be resplit to a maximum of four hands; split Aces receive one card each.</li>
+                <li>Late surrender is {rules.lateSurrender ? 'allowed on an unsplit original two-card hand' : 'not offered'}.</li>
+                <li>Change any of these in Settings → Table rules.</li>
               </ul>
             </details>
 
@@ -214,7 +197,7 @@ export default function CheatSheet({ onClose }) {
                 <p>Random hand, random count. Pick the play, then read the rule behind it — deviations included.</p>
               </div>
             </section>
-            <StrategyQuiz />
+            <StrategyQuiz rules={rules} />
           </>
         )}
 
@@ -246,12 +229,11 @@ export default function CheatSheet({ onClose }) {
             </section>
 
             <section>
-              <h3>Bet sizing: a practice ramp</h3>
-              <p className="section-intro">This trainer uses a fixed $25 unit and warns before the deal when the wager does not match the count.</p>
-              <GuideTable rows={BET_RAMP_GUIDE_ROWS} headings={['True count', 'Bet', 'Units']} />
+              <h3>Bet sizing</h3>
+              <p className="section-intro">Your spread lives in the <button type="button" className="inline-link" onClick={() => setActiveTab('spread')}>Bet spread</button> tab, where it is sized to the table rules and your bankroll. The bet-sizing guard at the table checks against that spread before every deal.</p>
               <div className="risk-note">
                 <strong>Size from bankroll, not emotion.</strong>
-                <span>A $1,000 practice bankroll contains 40 units at $25 each. This ramp is for training and does not eliminate risk of ruin.</span>
+                <span>Keep the unit fixed for the session, raise bets only from the true count before the deal, and never chase.</span>
               </div>
             </section>
 
@@ -285,7 +267,7 @@ export default function CheatSheet({ onClose }) {
       </div>
 
       <div className="study-footer">
-        Strategy shown is tailored to this trainer’s six-deck H17 rules.
+        Strategy and spread shown are tailored to the rules in Settings: {describeRules(rules)}.
       </div>
     </aside>
   );

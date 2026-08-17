@@ -2,14 +2,22 @@ import { Card } from './Card';
 
 const SUITS = ['♥', '♦', '♣', '♠'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const PENETRATION_LIMIT = 1.5 * 52;
 
 export class Shoe {
-  constructor(decks = 6) {
+  constructor(decks = 6, penetration = 0.75) {
     this.decks = decks;
+    this.penetration = penetration;
     this.cards = [];
     this.visibleRunningCount = 0;
     this.buildAndShuffle();
+  }
+
+  configure(decks, penetration) {
+    if (decks === this.decks && penetration === this.penetration) return false;
+    this.decks = decks;
+    this.penetration = penetration;
+    this.buildAndShuffle();
+    return true;
   }
 
   buildAndShuffle() {
@@ -34,6 +42,10 @@ export class Shoe {
     return new Card(raw.suit, raw.value);
   }
 
+  get totalCards() {
+    return this.decks * 52;
+  }
+
   get trueCount() {
     return Math.round(this.visibleRunningCount / Math.max(1, this.decksRemaining));
   }
@@ -42,7 +54,11 @@ export class Shoe {
     return this.cards.length / 52;
   }
 
+  get cutCardPosition() {
+    return Math.round((1 - this.penetration) * this.totalCards);
+  }
+
   needsShuffle() {
-    return this.cards.length <= PENETRATION_LIMIT;
+    return this.cards.length <= this.cutCardPosition;
   }
 }
