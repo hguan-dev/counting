@@ -25,6 +25,7 @@ import CountDrillModal from './components/CountDrillModal';
 import ShoeTray from './components/ShoeTray';
 import DealerShoe from './components/DealerShoe';
 import ChipRack from './components/ChipRack';
+import NumberField from './components/NumberField';
 import useTableVoice from './hooks/useTableVoice';
 import {
   getSpokenCountSummary,
@@ -41,6 +42,7 @@ import {
 } from './utils/sessionAccounting';
 import { loadSessionState, saveSessionState } from './utils/persistence';
 import { loadSessionHistory, saveSessionHistory, summarizeSession } from './utils/sessionHistory';
+import { computeActionEvs } from './utils/actionEv';
 import {
   loadProfile,
   recordDecisions,
@@ -201,6 +203,9 @@ export default function App() {
   ));
   const [warnBetSizing, setWarnBetSizing] = useState(() => (
     typeof restored?.warnBetSizing === 'boolean' ? restored.warnBetSizing : false
+  ));
+  const [showActionEvs, setShowActionEvs] = useState(() => (
+    typeof restored?.showActionEvs === 'boolean' ? restored.showActionEvs : false
   ));
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -1436,13 +1441,14 @@ export default function App() {
       strategyMistakes,
       tablePace,
       sessionStartedAt: sessionStartedRef.current,
+      showActionEvs,
       totalBuyIns,
       warnBetSizing,
       warnStrategy,
     });
   }, [
     aiSeatCount, bankroll, betSpread, countDrillEnabled, countDrillStats, numHands, playerSpots,
-    reloadAmount, rules, sessionHands, showStrategyPopups, spotBets,
+    reloadAmount, rules, sessionHands, showActionEvs, showStrategyPopups, spotBets,
     strategyDecisions, strategyMistakes, tablePace, totalBuyIns, warnBetSizing, warnStrategy,
   ]);
 
@@ -1810,6 +1816,20 @@ export default function App() {
     </div>
   );
 
+  const activeHandForEv = gameState === 'playing' ? getCurrentActiveHand() : null;
+  const actionEvs = showActionEvs && activeHandForEv && dealerHand[0]
+    ? computeActionEvs({
+      canDouble: activeHandForEv.cards.length === 2 && (rules.doubleAfterSplit || !activeHandForEv.isSplitHand),
+      canSplit: canSplitCurrent(),
+      canSurrender: rules.lateSurrender && canSurrenderHand(activeHandForEv),
+      dealerUpCard: dealerHand[0],
+      doubleAfterSplit: rules.doubleAfterSplit,
+      hitsSoft17: rules.dealerHitsSoft17,
+      playerCards: activeHandForEv.cards,
+      trueCount: shoeRef.current.visibleRunningCount / Math.max(1, shoeRef.current.decksRemaining),
+    })
+    : null;
+
   const accuracyRate = strategyDecisions > 0
     ? Math.round(((strategyDecisions - strategyMistakes) / strategyDecisions) * 100)
     : 0;
@@ -1947,6 +1967,8 @@ export default function App() {
           onWarnStrategyChange={setWarnStrategy}
           warnBetSizing={warnBetSizing}
           onWarnBetSizingChange={setWarnBetSizing}
+          showActionEvs={showActionEvs}
+          onShowActionEvsChange={setShowActionEvs}
           showStrategyPopups={showStrategyPopups}
           onStrategyPopupsChange={setShowStrategyPopups}
           soundEnabled={soundEnabled}
@@ -2122,15 +2144,15 @@ export default function App() {
             </div>
             <label className="reload-custom" htmlFor="reload-amount">
               <span>Custom</span>
-              <input
+              <NumberField
                 id="reload-amount"
                 aria-label="Custom reload amount"
-                type="number"
                 min="1"
                 max="100000"
                 step="100"
                 value={reloadAmount}
-                onChange={event => setReloadAmount(Number(event.target.value))}
+                onCommit={setReloadAmount}
+                clamp={amount => Math.min(100000, Math.max(1, Math.round(amount)))}
               />
             </label>
             <button className="reload-confirm" onClick={() => addToBankroll()}>Add funds</button>
@@ -2366,6 +2388,7 @@ export default function App() {
           onHint={requestHint}
           onInsurance={executeInsurance}
           onNextRound={beginNextRound}
+          actionEvs={actionEvs}
         />
       )}
     </main>

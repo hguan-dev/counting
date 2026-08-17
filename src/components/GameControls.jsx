@@ -1,3 +1,5 @@
+import NumberField from './NumberField';
+
 export default function GameControls({
   gameState,
   spotBets,
@@ -18,7 +20,25 @@ export default function GameControls({
   onHint,
   onInsurance,
   onNextRound,
+  actionEvs = null,
 }) {
+  const evFor = action => (actionEvs?.evs?.[action] === undefined ? null : actionEvs.evs[action]);
+  const evLabel = (action) => {
+    const value = evFor(action);
+    if (value === null) return null;
+    return `${value >= 0 ? '+' : '−'}${Math.abs(value * 100).toFixed(1)}%`;
+  };
+  const isBest = action => actionEvs?.best === action;
+  const actionSub = (action) => {
+    const ev = evLabel(action);
+    const hinted = hintedAction === action;
+    if (!ev && !hinted) return null;
+    return (
+      <small className={`action-sub ${isBest(action) ? 'is-best' : ''}`}>
+        {hinted ? 'Recommended' : ''}{hinted && ev ? ' · ' : ''}{ev ? `EV ${ev}` : ''}
+      </small>
+    );
+  };
   return (
     <div className={`game-controls is-${gameState}`} aria-label="Game controls">
       {gameState === 'betting' && (
@@ -44,12 +64,12 @@ export default function GameControls({
               <span>Spot {spotIndex + 1} wager</span>
               <span className="control-input has-prefix">
                 <b>$</b>
-                <input
+                <NumberField
                   id={`wager-${spotIndex + 1}`}
                   aria-label={`Spot ${spotIndex + 1} wager amount`}
-                  type="number"
                   value={spotBets[spotIndex]}
-                  onChange={(event) => setSpotBet(spotIndex, Number(event.target.value))}
+                  onCommit={amount => setSpotBet(spotIndex, amount)}
+                  clamp={amount => Math.min(10000, Math.max(5, Math.round(amount * 2) / 2))}
                   step="5"
                   min="5"
                   max="10000"
@@ -76,47 +96,54 @@ export default function GameControls({
         </div>
       )}
 
+      {gameState === 'playing' && actionEvs && (
+        <div className="ev-caption" aria-live="polite">
+          <span>Count-adjusted EV per unit bet</span>
+          <b>Dealer busts {Math.round(actionEvs.dealerBust * 100)}%</b>
+        </div>
+      )}
+
       {gameState === 'playing' && (
-        <div className="action-cluster">
+        <div className={`action-cluster ${actionEvs ? 'has-evs' : ''}`}>
           <button
-            className={`action-button is-hit ${hintedAction === 'hit' ? 'is-hinted' : ''}`}
+            className={`action-button is-hit ${hintedAction === 'hit' ? 'is-hinted' : ''} ${isBest('hit') ? 'is-best-ev' : ''}`}
             onClick={onHit}
           >
             <span>Hit</span>
-            {hintedAction === 'hit' && <small>Recommended</small>}
+            {actionSub('hit')}
           </button>
           <button
-            className={`action-button is-stand ${hintedAction === 'stand' ? 'is-hinted' : ''}`}
+            className={`action-button is-stand ${hintedAction === 'stand' ? 'is-hinted' : ''} ${isBest('stand') ? 'is-best-ev' : ''}`}
             onClick={onStand}
           >
             <span>Stand</span>
-            {hintedAction === 'stand' && <small>Recommended</small>}
+            {actionSub('stand')}
           </button>
           {canDouble && (
             <button
-              className={`action-button is-double ${hintedAction === 'double' ? 'is-hinted' : ''}`}
+              className={`action-button is-double ${hintedAction === 'double' ? 'is-hinted' : ''} ${isBest('double') ? 'is-best-ev' : ''}`}
               onClick={onDouble}
             >
               <span>Double</span>
-              {hintedAction === 'double' && <small>Recommended</small>}
+              {actionSub('double')}
             </button>
           )}
           {canSplit && (
             <button
-              className={`action-button is-split ${hintedAction === 'split' ? 'is-hinted' : ''}`}
+              className={`action-button is-split ${hintedAction === 'split' ? 'is-hinted' : ''} ${isBest('split') ? 'is-best-ev' : ''}`}
               onClick={onSplit}
             >
               <span>{canResplit ? 'Resplit' : 'Split'}</span>
-              {hintedAction === 'split' && <small>Recommended</small>}
+              {actionSub('split')}
             </button>
           )}
           {canSurrender && (
             <button
-              className={`action-button is-surrender ${hintedAction === 'surrender' ? 'is-hinted' : ''}`}
+              className={`action-button is-surrender ${hintedAction === 'surrender' ? 'is-hinted' : ''} ${isBest('surrender') ? 'is-best-ev' : ''}`}
               onClick={onSurrender}
             >
               <span>Surrender</span>
-              {hintedAction === 'surrender' && <small>Recommended</small>}
+              {actionSub('surrender')}
             </button>
           )}
           <button

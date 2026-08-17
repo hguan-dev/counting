@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card } from '../models/Card';
 import PlayingCard from './PlayingCard';
 import { calculateTotal, getDetailedPlay, isSoftHand } from '../utils/strategyEngine';
+import { computeActionEvs, formatEv } from '../utils/actionEv';
 
 const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const SUITS = ['♠', '♥', '♦', '♣'];
@@ -41,6 +42,18 @@ export default function StrategyQuiz({ rules }) {
   const total = calculateTotal(cards);
   const soft = isSoftHand(cards);
   const isCorrect = answer === evaluation.action;
+  const evReport = answer
+    ? computeActionEvs({
+      canDouble: true,
+      canSplit: isPair,
+      canSurrender: rules?.lateSurrender !== false,
+      dealerUpCard: dealerCard,
+      doubleAfterSplit: rules?.doubleAfterSplit !== false,
+      hitsSoft17: rules?.dealerHitsSoft17 !== false,
+      playerCards: cards,
+      trueCount,
+    })
+    : null;
 
   const choices = [
     ['hit', 'Hit'],
@@ -109,6 +122,19 @@ export default function StrategyQuiz({ rules }) {
               : `Not quite. The play is ${evaluation.action}.`}
           </strong>
           <span className="quiz-rule"><b>{evaluation.type}:</b> {evaluation.rule}</span>
+          {evReport && (
+            <ul className="quiz-evs" aria-label="Expected value of each action at this count">
+              {Object.entries(evReport.evs)
+                .sort((a, b) => b[1] - a[1])
+                .map(([action, value]) => (
+                  <li key={action} className={action === evReport.best ? 'is-best' : ''}>
+                    <span>{action}</span>
+                    <b>{formatEv(value)}</b>
+                  </li>
+                ))}
+              <li className="is-note"><span>Dealer busts</span><b>{Math.round(evReport.dealerBust * 100)}%</b></li>
+            </ul>
+          )}
           <button className="quiz-next" autoFocus onClick={nextHand}>Next hand</button>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import NumberField from './NumberField';
 import { BET_UNIT, TABLE_MAX_BET } from '../utils/betSizing';
 import {
   evaluateBetSpread,
@@ -84,34 +85,34 @@ export default function BetSpreadLab({
       <section className="spread-inputs">
         <label>
           <span>Bankroll</span>
-          <input
-            type="number"
+          <NumberField
             min="500"
             step="500"
             value={labBankroll}
-            onChange={event => setLabBankroll(Math.max(100, Number(event.target.value) || 0))}
+            onCommit={setLabBankroll}
+            clamp={amount => Math.max(100, Math.round(amount))}
           />
         </label>
         <label>
           <span>Hands / hour</span>
-          <input
-            type="number"
+          <NumberField
             min="30"
             max="400"
             step="10"
             value={handsPerHour}
-            onChange={event => setHandsPerHour(Math.min(400, Math.max(30, Number(event.target.value) || 30)))}
+            onCommit={setHandsPerHour}
+            clamp={amount => Math.min(400, Math.max(30, Math.round(amount)))}
           />
         </label>
         <label>
           <span>Max bet</span>
-          <input
-            type="number"
+          <NumberField
             min={BET_UNIT}
             max={TABLE_MAX_BET}
             step={BET_UNIT}
             value={maxBet}
-            onChange={event => setMaxBet(Math.min(TABLE_MAX_BET, Math.max(BET_UNIT, Number(event.target.value) || BET_UNIT)))}
+            onCommit={setMaxBet}
+            clamp={amount => Math.min(TABLE_MAX_BET, Math.max(BET_UNIT, Math.round(amount / BET_UNIT) * BET_UNIT))}
           />
         </label>
       </section>
@@ -211,14 +212,14 @@ export default function BetSpreadLab({
                 <td>
                   <span className="bet-input">
                     <b>$</b>
-                    <input
-                      type="number"
+                    <NumberField
                       min="0"
                       max={TABLE_MAX_BET}
                       step={BET_UNIT}
                       value={row.bet}
                       aria-label={`Bet at true count ${formatTc(row.trueCount)}`}
-                      onChange={event => updateBet(row.trueCount, Number(event.target.value))}
+                      onCommit={amount => updateBet(row.trueCount, amount)}
+                      clamp={amount => Math.min(TABLE_MAX_BET, Math.max(0, Math.round(amount / BET_UNIT) * BET_UNIT))}
                     />
                   </span>
                 </td>

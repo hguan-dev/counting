@@ -39,6 +39,8 @@ export default function SettingsDrawer({
   onWarnStrategyChange,
   warnBetSizing = false,
   onWarnBetSizingChange,
+  showActionEvs = false,
+  onShowActionEvsChange,
   showStrategyPopups,
   onStrategyPopupsChange,
   tablePace,
@@ -212,6 +214,12 @@ export default function SettingsDrawer({
               description="Warn before the deal when your wager doesn't match your bet spread for the count."
               checked={warnBetSizing}
               onChange={() => onWarnBetSizingChange(!warnBetSizing)}
+            />
+            <SettingRow
+              label="Show action EVs"
+              description="Print the count-adjusted expected value of hit, stand, double, split, and surrender on the buttons, plus the dealer's bust chance."
+              checked={showActionEvs}
+              onChange={() => onShowActionEvsChange(!showActionEvs)}
             />
             <SettingRow
               label="Correction popups"
