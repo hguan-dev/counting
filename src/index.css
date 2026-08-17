@@ -3807,6 +3807,12 @@ button:disabled {
   font-weight: 800;
 }
 
+.strategy-charts + .chart-section {
+  margin-top: 2.4rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid rgba(232, 197, 106, 0.18);
+}
+
 .deviation-chart td {
   min-width: 46px;
   height: 36px;
