@@ -2,10 +2,12 @@ import { describe, expect, test } from 'vitest';
 import {
   DEFAULT_BET_SPREAD,
   evaluateBetSpread,
+  getKellyMaxBet,
   getSpreadBet,
   getTrueCountDistribution,
   normalizeBetSpread,
   optimizeBetSpread,
+  randomBetSpread,
   SPREAD_TRUE_COUNTS,
 } from './betSpread';
 import { DEFAULT_RULES, getHouseEdgePercent, normalizeRules } from './tableRules';
@@ -60,13 +62,13 @@ describe('bet spread evaluation', () => {
     expect(result.riskOfRuin).toBe(1);
   });
 
-  test('the default ramp beats flat betting and a Kelly spread beats both', () => {
+  test('the default ramp beats flat betting and an edge-shaped ramp beats both', () => {
     const base = { bankroll: 20000, handsPerHour: 200, rules: DEFAULT_RULES };
     const flat = evaluateBetSpread({ ...base, spread: Object.fromEntries(SPREAD_TRUE_COUNTS.map(tc => [String(tc), 25])) });
     const ramp = evaluateBetSpread({ ...base, spread: DEFAULT_BET_SPREAD });
     const optimized = evaluateBetSpread({
       ...base,
-      spread: optimizeBetSpread({ bankroll: 20000, kellyFraction: 1, maxBet: 500, rules: DEFAULT_RULES }),
+      spread: optimizeBetSpread({ maxBet: 500, rules: DEFAULT_RULES }),
     });
     expect(ramp.evPerHour).toBeGreaterThan(flat.evPerHour);
     expect(optimized.evPerHour).toBeGreaterThan(ramp.evPerHour);
@@ -75,16 +77,21 @@ describe('bet spread evaluation', () => {
     expect(optimized.sdPerHour).toBeGreaterThan(0);
   });
 
-  test('a small bankroll gets a conservative, near-flat half-Kelly spread', () => {
-    const spread = optimizeBetSpread({ bankroll: 5000, kellyFraction: 0.5, maxBet: 300, rules: DEFAULT_RULES });
-    expect(spread['2']).toBe(25);
-    expect(spread['6']).toBeLessThanOrEqual(75);
+  test('the builder produces a real ramp from the max bet, never a flat spread', () => {
+    const spread = optimizeBetSpread({ maxBet: 300, rules: DEFAULT_RULES });
+    expect(spread['1']).toBe(25);
+    expect(spread['2']).toBeGreaterThan(25);
+    expect(spread['2']).toBeLessThan(spread['4']);
+    expect(spread['6']).toBe(300);
+    // Ratio between rungs follows the edge ratio (roughly 1:2:4:6:8:12).
+    expect(spread['3']).toBeGreaterThanOrEqual(75);
+    expect(spread['5']).toBeGreaterThanOrEqual(200);
   });
 
   test('sitting out negative counts raises EV per hand played', () => {
     const rules = DEFAULT_RULES;
-    const stay = optimizeBetSpread({ bankroll: 5000, maxBet: 300, rules });
-    const wong = optimizeBetSpread({ bankroll: 5000, maxBet: 300, rules, sitOutBelow: -1 });
+    const stay = optimizeBetSpread({ maxBet: 300, rules });
+    const wong = optimizeBetSpread({ maxBet: 300, rules, sitOutBelow: -1 });
     expect(wong['-2']).toBe(0);
     expect(wong['-1']).toBe(0);
     expect(wong['0']).toBe(25);
@@ -94,8 +101,8 @@ describe('bet spread evaluation', () => {
     expect(wongResult.handsSatOut).toBeGreaterThan(0.1);
   });
 
-  test('optimizer never bets less at a higher count and respects the cap', () => {
-    const spread = optimizeBetSpread({ bankroll: 20000, kellyFraction: 1, maxBet: 500, rules: DEFAULT_RULES });
+  test('builder never bets less at a higher count and respects the cap', () => {
+    const spread = optimizeBetSpread({ maxBet: 500, rules: DEFAULT_RULES });
     let previous = 0;
     SPREAD_TRUE_COUNTS.forEach((tc) => {
       expect(spread[String(tc)]).toBeGreaterThanOrEqual(previous);
@@ -103,9 +110,36 @@ describe('bet spread evaluation', () => {
       expect(spread[String(tc)] % 25).toBe(0);
       previous = spread[String(tc)];
     });
-    const capped = optimizeBetSpread({ bankroll: 200000, kellyFraction: 1, maxBet: 500, rules: DEFAULT_RULES });
-    expect(capped['6']).toBe(500);
-    expect(capped['3']).toBe(500);
+    expect(spread['6']).toBe(500);
+  });
+
+  test('Kelly max bet scales with bankroll and fraction', () => {
+    expect(getKellyMaxBet({ bankroll: 1000, kellyFraction: 0.5, rules: DEFAULT_RULES })).toBeLessThan(25);
+    const half = getKellyMaxBet({ bankroll: 20000, kellyFraction: 0.5, rules: DEFAULT_RULES });
+    const full = getKellyMaxBet({ bankroll: 20000, kellyFraction: 1, rules: DEFAULT_RULES });
+    expect(half).toBeGreaterThan(100);
+    expect(full).toBeGreaterThan(half);
+    expect(full % 25).toBe(0);
+  });
+
+  test('random ramps are monotonic, hit the max bet, and vary', () => {
+    const seen = new Set();
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const spread = randomBetSpread({ maxBet: 300 });
+      let previous = 0;
+      SPREAD_TRUE_COUNTS.forEach((tc) => {
+        expect(spread[String(tc)]).toBeGreaterThanOrEqual(previous);
+        expect(spread[String(tc)] % 25).toBe(0);
+        previous = spread[String(tc)];
+      });
+      expect(spread['1']).toBe(25);
+      expect(spread['6']).toBe(300);
+      seen.add(JSON.stringify(spread));
+    }
+    expect(seen.size).toBeGreaterThan(3);
+    const wong = randomBetSpread({ maxBet: 300, sitOutBelow: -1 });
+    expect(wong['-2']).toBe(0);
+    expect(wong['0']).toBe(25);
   });
 
   test('normalizeBetSpread rounds to units and getSpreadBet clamps the count', () => {

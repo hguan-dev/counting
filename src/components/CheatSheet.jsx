@@ -2,6 +2,7 @@ import { useState } from 'react';
 import StrategyQuiz from './StrategyQuiz';
 import StrategyChart from './StrategyChart';
 import BetSpreadLab from './BetSpreadLab';
+import DeviationChart from './DeviationChart';
 import { DEVIATION_GUIDE_GROUPS } from '../utils/deviations';
 import { describeRules } from '../utils/tableRules';
 
@@ -85,8 +86,13 @@ export default function CheatSheet({
 
             <StrategyChart rules={rules} />
 
+            <section className="chart-section">
+              <h3>Hi-Lo deviations</h3>
+              <DeviationChart rules={rules} />
+            </section>
+
             <details>
-              <summary>Complete Hi-Lo deviation index</summary>
+              <summary>Deviations as a list</summary>
               <p className="section-intro">Six-deck H17, DAS, late surrender indices. RC means running count; all other indices use the rounded true count.</p>
               {DEVIATION_GUIDE_GROUPS.map(group => (
                 <div className="deviation-group" key={group.title}>

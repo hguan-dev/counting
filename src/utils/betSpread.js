@@ -128,30 +128,45 @@ export const evaluateBetSpread = ({
 };
 
 /**
- * Kelly-style spread: bet ∝ edge / variance × bankroll at positive counts,
- * table minimum (or sit out) otherwise. Rounded to the table unit and capped.
+ * The Kelly-optimal top bet for a bankroll: at the highest count, bet
+ * kellyFraction × edge / variance × bankroll. This is advice about how big the
+ * ramp's top rung should be for the bankroll — the ramp shape itself comes
+ * from optimizeBetSpread.
+ */
+export const getKellyMaxBet = ({ bankroll, kellyFraction = 0.5, rules }) => {
+  const topEdge = getPlayerEdgePercent(rules, representativeTrueCount(SPREAD_MAX_TC)) / 100;
+  if (topEdge <= 0) return 0;
+  const raw = (kellyFraction * topEdge / HAND_VARIANCE) * bankroll;
+  return Math.max(0, Math.round(raw / BET_UNIT) * BET_UNIT);
+};
+
+/**
+ * Build a ramp for the rules: bets scale with the player's edge at each true
+ * count (the Kelly-optimal shape), anchored so the top count gets `maxBet`
+ * and non-advantage counts get the table minimum (or sit out). Rounded to the
+ * table unit and never decreasing as the count rises.
  */
 export const optimizeBetSpread = ({
-  bankroll,
-  kellyFraction = 0.5,
   maxBet = 300,
   rules,
   sitOutBelow = null,
 }) => {
+  const cappedMax = Math.max(BET_UNIT, Math.min(TABLE_MAX_BET, Math.round(maxBet / BET_UNIT) * BET_UNIT));
+  const topEdge = getPlayerEdgePercent(rules, representativeTrueCount(SPREAD_MAX_TC)) / 100;
   const spread = {};
   SPREAD_TRUE_COUNTS.forEach((tc) => {
-    const edge = getPlayerEdgePercent(rules, representativeTrueCount(tc)) / 100;
     if (sitOutBelow !== null && tc <= sitOutBelow) {
       spread[String(tc)] = 0;
       return;
     }
-    if (edge <= 0) {
+    const edge = getPlayerEdgePercent(rules, representativeTrueCount(tc)) / 100;
+    if (edge <= 0 || topEdge <= 0) {
       spread[String(tc)] = BET_UNIT;
       return;
     }
-    const kellyBet = (kellyFraction * edge / HAND_VARIANCE) * bankroll;
-    const rounded = Math.round(kellyBet / BET_UNIT) * BET_UNIT;
-    spread[String(tc)] = Math.min(maxBet, Math.max(BET_UNIT, rounded));
+    const scaled = cappedMax * (edge / topEdge);
+    const rounded = Math.round(scaled / BET_UNIT) * BET_UNIT;
+    spread[String(tc)] = Math.min(cappedMax, Math.max(BET_UNIT, rounded));
   });
   // Never bet less at a higher count than at a lower one.
   let floor = 0;
@@ -159,6 +174,34 @@ export const optimizeBetSpread = ({
     if (spread[String(tc)] === 0) return;
     floor = Math.max(floor, spread[String(tc)]);
     spread[String(tc)] = floor;
+  });
+  return spread;
+};
+
+/**
+ * A random non-decreasing ramp: table minimum through +1, then random rungs
+ * that never fall as the count rises, topping out at (or below) `maxBet`.
+ * Useful for exploring how spread shape moves EV and risk.
+ */
+export const randomBetSpread = ({ maxBet = 300, sitOutBelow = null, random = Math.random }) => {
+  const cappedMax = Math.max(BET_UNIT, Math.min(TABLE_MAX_BET, Math.round(maxBet / BET_UNIT) * BET_UNIT));
+  const steps = Math.max(1, Math.round((cappedMax - BET_UNIT) / BET_UNIT));
+  const advantageCounts = SPREAD_TRUE_COUNTS.filter(tc => tc >= 2);
+  // Draw a sorted set of unit-multiples so the ramp is monotonic by construction.
+  const draws = advantageCounts.map(() => Math.floor(random() * (steps + 1))).sort((a, b) => a - b);
+  draws[draws.length - 1] = steps; // the top count always reaches the max bet
+  const spread = {};
+  SPREAD_TRUE_COUNTS.forEach((tc) => {
+    if (sitOutBelow !== null && tc <= sitOutBelow) {
+      spread[String(tc)] = 0;
+      return;
+    }
+    if (tc < 2) {
+      spread[String(tc)] = BET_UNIT;
+      return;
+    }
+    const draw = draws[advantageCounts.indexOf(tc)];
+    spread[String(tc)] = BET_UNIT + draw * BET_UNIT;
   });
   return spread;
 };

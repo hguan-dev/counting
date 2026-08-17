@@ -23,6 +23,7 @@ import BankrollScore from './components/BankrollScore';
 import SettingsDrawer from './components/SettingsDrawer';
 import CountDrillModal from './components/CountDrillModal';
 import ShoeTray from './components/ShoeTray';
+import DealerShoe from './components/DealerShoe';
 import useTableVoice from './hooks/useTableVoice';
 import {
   getSpokenCountSummary,
@@ -1980,13 +1981,14 @@ export default function App() {
       {/* GAME BOARD TABLE */}
       <div className={`game-board is-${gameState}`}>
         <ShoeTray
-          dealtFraction={1 - shoeRef.current.cards.length / (shoeRef.current.decks * 52)}
+          dealtFraction={1 - shoeRef.current.cards.length / shoeRef.current.totalCards}
           decks={shoeRef.current.decks}
         />
-        <div className="dealer-shoe" aria-hidden="true">
-          <i />
-          <span>Shoe</span>
-        </div>
+        <DealerShoe
+          remainingFraction={shoeRef.current.cards.length / shoeRef.current.totalCards}
+          cutFraction={shoeRef.current.cutCardPosition / shoeRef.current.totalCards}
+          decksRemaining={shoeRef.current.decksRemaining}
+        />
         <svg className="table-rule-arc" viewBox="0 0 900 170" aria-hidden="true">
           <defs>
             <path id="table-rule-path" d="M 55 150 Q 450 -90 845 150" />

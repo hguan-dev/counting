@@ -8,12 +8,12 @@ export default function ShoeTray({ dealtFraction, decks }) {
       className="shoe-tray"
       role="img"
       aria-label={`Discard tray about ${percent} percent full`}
-      title={`≈ ${decksDealt.toFixed(1)} of ${decks} decks dealt`}
+      title={`≈ ${decksDealt.toFixed(1)} of ${decks} decks in the discards`}
     >
       <div className="shoe-tray-well">
         <div
           className="shoe-tray-fill"
-          style={{ height: `${Math.max(3, percent)}%` }}
+          style={{ height: `${Math.max(1.5, clamped * 100)}%` }}
         />
       </div>
       <span className="shoe-tray-label">Discards</span>

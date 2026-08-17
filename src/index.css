@@ -1159,69 +1159,6 @@ button:disabled {
   letter-spacing: 0.18em;
 }
 
-.dealer-shoe {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.7rem;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.dealer-shoe i {
-  position: relative;
-  display: block;
-  width: 62px;
-  height: 84px;
-  overflow: hidden;
-  border: 1px solid rgba(232, 197, 106, 0.38);
-  border-radius: 8px 8px 10px 10px;
-  background: linear-gradient(200deg, #55371f 0%, #3a2312 70%);
-  box-shadow:
-    inset 0 2px 4px rgba(255, 255, 255, 0.12),
-    inset 0 -8px 14px rgba(0, 0, 0, 0.45),
-    0 8px 16px rgba(0, 0, 0, 0.35);
-  transform: perspective(260px) rotateX(-10deg);
-}
-
-.dealer-shoe i::before {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  left: 6px;
-  height: 16px;
-  border-radius: 3px 3px 2px 2px;
-  background: repeating-linear-gradient(180deg, #f2edde 0 2px, #cfc8b1 2px 3px);
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.3);
-  content: "";
-}
-
-.dealer-shoe i::after {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  width: 26px;
-  height: 26px;
-  border: 1px solid rgba(232, 197, 106, 0.4);
-  border-radius: 50%;
-  background: rgba(2, 20, 12, 0.4);
-  content: "♠";
-  color: rgba(232, 197, 106, 0.5);
-  font-size: 0.8rem;
-  line-height: 26px;
-  text-align: center;
-  transform: translateX(-50%);
-}
-
-.dealer-shoe span {
-  color: rgba(232, 197, 106, 0.5);
-  font-size: 0.5rem;
-  font-weight: 800;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
 
 .player-hand {
   position: relative;
@@ -2775,47 +2712,109 @@ button:disabled {
 
 .shoe-tray {
   position: absolute;
-  top: 1.5rem;
+  top: 1.4rem;
   left: 1.7rem;
   z-index: 5;
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .shoe-tray-well {
   position: relative;
-  width: 44px;
-  height: 88px;
+  width: 64px;
+  height: 118px;
   overflow: hidden;
-  border: 1px solid rgba(232, 197, 106, 0.38);
-  border-radius: 7px;
-  background: rgba(2, 24, 15, 0.55);
+  border: 1px solid rgba(232, 197, 106, 0.4);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.35), transparent 30%, transparent 70%, rgba(0, 0, 0, 0.35)),
+    rgba(2, 24, 15, 0.7);
   box-shadow:
-    inset 0 5px 12px rgba(0, 0, 0, 0.5),
-    inset 0 -1px rgba(255, 255, 255, 0.06);
-  transform: perspective(260px) rotateX(12deg);
+    inset 0 6px 14px rgba(0, 0, 0, 0.55),
+    inset 0 -1px rgba(255, 255, 255, 0.06),
+    0 6px 14px rgba(0, 0, 0, 0.3);
+  transform: perspective(300px) rotateX(10deg);
 }
 
 .shoe-tray-fill {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  left: 4px;
+  right: 5px;
+  bottom: 5px;
+  left: 5px;
   border-top: 2px solid #fbfaf4;
-  border-radius: 3px;
-  background: repeating-linear-gradient(180deg, #f2edde 0 2px, #cfc8b1 2px 3px);
-  box-shadow: 0 -3px 6px rgba(0, 0, 0, 0.3);
+  border-radius: 3px 3px 2px 2px;
+  background: repeating-linear-gradient(180deg, #f2edde 0 2px, #cbc4ab 2px 3px);
+  box-shadow: 0 -3px 6px rgba(0, 0, 0, 0.35);
   transition: height 700ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.shoe-tray-label {
-  color: rgba(232, 197, 106, 0.5);
-  font-size: 0.5rem;
+.shoe-tray-label,
+.dealer-shoe > span {
+  color: rgba(232, 197, 106, 0.55);
+  font-size: 0.52rem;
   font-weight: 800;
   letter-spacing: 0.15em;
   text-transform: uppercase;
+}
+
+.dealer-shoe {
+  position: absolute;
+  top: 1.4rem;
+  right: 1.7rem;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dealer-shoe i {
+  position: relative;
+  display: block;
+  width: 84px;
+  height: 118px;
+  overflow: hidden;
+  border: 1px solid rgba(232, 197, 106, 0.4);
+  border-radius: 10px 10px 8px 8px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.32), transparent 22%, transparent 78%, rgba(0, 0, 0, 0.32)),
+    linear-gradient(200deg, #5b3b21 0%, #3d2513 70%);
+  box-shadow:
+    inset 0 3px 5px rgba(255, 255, 255, 0.1),
+    inset 0 -10px 16px rgba(0, 0, 0, 0.5),
+    0 10px 20px rgba(0, 0, 0, 0.38);
+  transform: perspective(320px) rotateX(-8deg);
+}
+
+.dealer-shoe-stack {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  left: 8px;
+  display: block;
+  border-top: 2px solid #fbfaf4;
+  border-radius: 3px 3px 2px 2px;
+  background: repeating-linear-gradient(180deg, #f5f1e4 0 2px, #cfc8b1 2px 3px);
+  box-shadow: 0 -3px 6px rgba(0, 0, 0, 0.35);
+  transition: height 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dealer-shoe-cut {
+  position: absolute;
+  right: 4px;
+  left: 4px;
+  z-index: 2;
+  display: block;
+  height: 3px;
+  background: #f4c430;
+  box-shadow: 0 0 6px rgba(244, 196, 48, 0.75);
+}
+
+.dealer-shoe-cut.is-reached {
+  background: #ff7b6b;
+  box-shadow: 0 0 8px rgba(255, 123, 107, 0.8);
 }
 
 .pace-options.is-seats {
@@ -2829,8 +2828,8 @@ button:disabled {
   }
 
   .shoe-tray-well {
-    width: 34px;
-    height: 66px;
+    width: 42px;
+    height: 78px;
   }
 
   .dealer-shoe {
@@ -2839,8 +2838,8 @@ button:disabled {
   }
 
   .dealer-shoe i {
-    width: 44px;
-    height: 62px;
+    width: 54px;
+    height: 78px;
   }
 
   .session-panel {
@@ -3772,4 +3771,73 @@ button:disabled {
   .pace-options.is-pen {
     grid-template-columns: repeat(4, 1fr);
   }
+}
+
+.spread-kelly-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.spread-kelly-hint strong {
+  color: #b7f2cc;
+}
+
+.spread-kelly-hint .inline-link {
+  margin-left: 0.4rem;
+}
+
+.spread-kelly-hint.is-warning {
+  color: #ffc9b0;
+}
+
+.spread-actions {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1.6fr 1fr;
+}
+
+.spread-random {
+  min-height: 42px;
+  border: 1px solid rgba(232, 197, 106, 0.42);
+  border-radius: 9px;
+  background: rgba(232, 197, 106, 0.1);
+  color: var(--gold-soft);
+  font-weight: 800;
+}
+
+.deviation-chart td {
+  min-width: 46px;
+  height: 36px;
+  padding: 0.15rem 0.1rem;
+  font-size: 0.6rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.deviation-chart td.is-empty {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.deviation-chart td.is-insurance,
+.chart-legend .is-insurance {
+  background: rgba(244, 196, 48, 0.32);
+  color: #fff0c2;
+}
+
+.deviation-primary {
+  display: block;
+}
+
+.deviation-secondary {
+  display: block;
+  color: rgba(247, 245, 237, 0.55);
+  font-size: 0.5rem;
+  font-weight: 700;
+}
+
+.deviation-chart tbody th {
+  min-width: 62px;
+  font-size: 0.62rem;
 }

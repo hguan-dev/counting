@@ -3,9 +3,11 @@ import { BET_UNIT, TABLE_MAX_BET } from '../utils/betSizing';
 import {
   evaluateBetSpread,
   formatMoney,
+  getKellyMaxBet,
   HANDS_PER_HOUR_BY_SEATS,
   normalizeBetSpread,
   optimizeBetSpread,
+  randomBetSpread,
   SPREAD_MAX_TC,
   SPREAD_MIN_TC,
 } from '../utils/betSpread';
@@ -30,7 +32,8 @@ export default function BetSpreadLab({
   spread,
   onSpreadChange,
 }) {
-  const [labBankroll, setLabBankroll] = useState(() => Math.max(1000, Math.round(bankroll)));
+  // Practice bankrolls are tiny; default the model to a realistic counting roll.
+  const [labBankroll, setLabBankroll] = useState(() => Math.max(10000, Math.round(bankroll)));
   const [handsPerHour, setHandsPerHour] = useState(() => HANDS_PER_HOUR_BY_SEATS[aiSeatCount] ?? 130);
   const [maxBet, setMaxBet] = useState(300);
   const [kellyFraction, setKellyFraction] = useState(0.5);
@@ -51,14 +54,14 @@ export default function BetSpreadLab({
     onSpreadChange(normalizeBetSpread({ ...spread, [String(tc)]: value }));
   };
 
+  const kellyMaxBet = getKellyMaxBet({ bankroll: labBankroll, kellyFraction, rules });
+
   const applyOptimized = () => {
-    onSpreadChange(optimizeBetSpread({
-      bankroll: labBankroll,
-      kellyFraction,
-      maxBet,
-      rules,
-      sitOutBelow: sitOut ? -1 : null,
-    }));
+    onSpreadChange(optimizeBetSpread({ maxBet, rules, sitOutBelow: sitOut ? -1 : null }));
+  };
+
+  const applyRandom = () => {
+    onSpreadChange(randomBetSpread({ maxBet, sitOutBelow: sitOut ? -1 : null }));
   };
 
   return (
@@ -128,13 +131,32 @@ export default function BetSpreadLab({
             </button>
           ))}
         </div>
+        <p className={`spread-kelly-hint ${kellyMaxBet < BET_UNIT ? 'is-warning' : ''}`}>
+          {kellyMaxBet >= BET_UNIT ? (
+            <>
+              For a {formatMoney(labBankroll)} bankroll, {KELLY_OPTIONS.find(([value]) => value === kellyFraction)[1].toLowerCase()} suggests a top bet of about <strong>{formatMoney(kellyMaxBet)}</strong>.
+              {kellyMaxBet !== maxBet && (
+                <button type="button" className="inline-link" onClick={() => setMaxBet(kellyMaxBet)}>Use it as max bet</button>
+              )}
+            </>
+          ) : (
+            <>
+              A {formatMoney(labBankroll)} bankroll can’t support a $25-unit spread at this Kelly fraction (it caps the top bet under $25). Raise the bankroll or accept more risk — the ramp below still builds from your max bet.
+            </>
+          )}
+        </p>
         <label className="spread-sitout">
           <input type="checkbox" checked={sitOut} onChange={() => setSitOut(!sitOut)} />
           <span>Sit out (bet $0) at TC −1 and below</span>
         </label>
-        <button className="spread-apply" onClick={applyOptimized}>
-          Build spread for these rules
-        </button>
+        <div className="spread-actions">
+          <button className="spread-apply" onClick={applyOptimized}>
+            Build ramp from these rules
+          </button>
+          <button className="spread-random" onClick={applyRandom} title="A random non-decreasing ramp up to the max bet">
+            Random ramp
+          </button>
+        </div>
       </section>
 
       <section className="spread-results" aria-live="polite">
