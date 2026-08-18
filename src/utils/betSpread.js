@@ -1,5 +1,5 @@
 import { BET_UNIT, TABLE_MAX_BET } from './betSizing';
-import { getPlayerEdgePercent } from './tableRules';
+import { getPlayerEdgePercent } from './advantageCurve';
 
 export const SPREAD_MIN_TC = -2;
 export const SPREAD_MAX_TC = 6;

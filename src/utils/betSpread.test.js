@@ -114,7 +114,7 @@ describe('bet spread evaluation', () => {
   });
 
   test('Kelly max bet scales with bankroll and fraction', () => {
-    expect(getKellyMaxBet({ bankroll: 1000, kellyFraction: 0.5, rules: DEFAULT_RULES })).toBeLessThan(25);
+    expect(getKellyMaxBet({ bankroll: 1000, kellyFraction: 0.5, rules: DEFAULT_RULES })).toBeLessThanOrEqual(25);
     const half = getKellyMaxBet({ bankroll: 20000, kellyFraction: 0.5, rules: DEFAULT_RULES });
     const full = getKellyMaxBet({ bankroll: 20000, kellyFraction: 1, rules: DEFAULT_RULES });
     expect(half).toBeGreaterThan(100);

@@ -54,10 +54,3 @@ export const getHouseEdgePercent = (rules) => {
   if (rules.blackjackPayout === 1.2) edge += 1.39;
   return Math.round(edge * 100) / 100;
 };
-
-// Hi-Lo player advantage gained per true count point, in percent.
-export const EDGE_PER_TRUE_COUNT = 0.5;
-
-export const getPlayerEdgePercent = (rules, trueCount) => (
-  -getHouseEdgePercent(rules) + EDGE_PER_TRUE_COUNT * trueCount
-);

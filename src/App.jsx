@@ -43,6 +43,7 @@ import {
 import { loadSessionState, saveSessionState } from './utils/persistence';
 import { loadSessionHistory, saveSessionHistory, summarizeSession } from './utils/sessionHistory';
 import { computeActionEvs } from './utils/actionEv';
+import { getAdvantageCurve } from './utils/advantageCurve';
 import {
   loadProfile,
   recordDecisions,
@@ -1422,6 +1423,21 @@ export default function App() {
     setShowSettings(false);
     announce('New session. Bankroll reset to one thousand dollars, fresh shoe.', { listenAfter: true });
   };
+
+  // Pre-compute the rules' advantage curve in idle time so the bet-spread lab
+  // and bet-sizing guard open instantly.
+  useEffect(() => {
+    let cancelled = false;
+    const warm = () => { if (!cancelled) getAdvantageCurve(rules); };
+    const handle = typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback(warm, { timeout: 4000 })
+      : window.setTimeout(warm, 1200);
+    return () => {
+      cancelled = true;
+      if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(handle);
+      else window.clearTimeout(handle);
+    };
+  }, [rules]);
 
   // Persist the session so a refresh keeps the bankroll, history, and settings.
   // Mid-round wagers are folded back into the saved bankroll since hands

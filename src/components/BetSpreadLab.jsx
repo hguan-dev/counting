@@ -13,6 +13,7 @@ import {
   SPREAD_MIN_TC,
 } from '../utils/betSpread';
 import { describeRules, getHouseEdgePercent } from '../utils/tableRules';
+import { getEdgePerTrueCount, getPlayerEdgePercent } from '../utils/advantageCurve';
 
 const KELLY_OPTIONS = [
   [1, 'Full Kelly', 'Max growth, wild swings'],
@@ -48,6 +49,13 @@ export default function BetSpreadLab({
   }), [labBankroll, handsPerHour, rules, spread]);
 
   const houseEdge = getHouseEdgePercent(rules);
+  const breakEvenTc = (() => {
+    for (let tc = -2; tc <= 8; tc += 0.1) {
+      if (getPlayerEdgePercent(rules, tc) >= 0) return tc;
+    }
+    return null;
+  })();
+  const breakEvenLabel = breakEvenTc === null ? '> +8' : `${breakEvenTc >= 0 ? '+' : ''}${breakEvenTc.toFixed(1)}`;
   const maxSpreadBet = Math.max(...Object.values(spread));
   const minSpreadBet = Math.min(...Object.values(spread).filter(bet => bet > 0), BET_UNIT);
 
@@ -78,7 +86,11 @@ export default function BetSpreadLab({
         </div>
         <div>
           <span>Per true count</span>
-          <strong className="is-positive">+0.50%</strong>
+          <strong className="is-positive">+{getEdgePerTrueCount(rules).toFixed(2)}%</strong>
+        </div>
+        <div>
+          <span>Break-even</span>
+          <strong>TC {breakEvenLabel}</strong>
         </div>
       </section>
 
@@ -233,7 +245,7 @@ export default function BetSpreadLab({
       </div>
 
       <p className="spread-note">
-        The frequency column comes from the count math for {rules.decks} deck{rules.decks === 1 ? '' : 's'} at {Math.round(rules.penetration * 100)}% penetration — deeper cuts and fewer decks put more hands in the high counts. Edge uses the standard ~0.5% per true-count point over the {houseEdge.toFixed(2)}% house edge these rules produce. Risk of ruin assumes no stop-loss and no bankroll growth. The bet sizing guard at the table uses this exact spread. Wagers you enter here are rounded to $25 units.
+        The frequency column comes from the count math for {rules.decks} deck{rules.decks === 1 ? '' : 's'} at {Math.round(rules.penetration * 100)}% penetration — deeper cuts and fewer decks put more hands in the high counts. The edge column is computed by the same EV engine that grades your play: it re-evaluates every starting hand for these rules at each true count (with count-aware play, naturals paid at {rules.blackjackPayout === 1.2 ? '6:5' : '3:2'}), anchored at TC 0 to the published {houseEdge.toFixed(2)}% house edge. Risk of ruin assumes no stop-loss and no bankroll growth. The bet-sizing guard at the table uses this exact spread. Wagers you enter here are rounded to $25 units.
       </p>
     </div>
   );

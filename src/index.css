@@ -3458,7 +3458,7 @@ button:disabled {
   border: 1px solid rgba(232, 197, 106, 0.22);
   border-radius: 11px;
   background: rgba(232, 197, 106, 0.05);
-  grid-template-columns: 1.6fr 1fr 1fr;
+  grid-template-columns: 1.8fr 1fr 1fr 1fr;
   gap: 0.8rem;
 }
 
@@ -4649,4 +4649,11 @@ button:disabled {
 
 .quiz-evs li.is-note {
   border-style: dashed;
+}
+
+.ev-footnote {
+  margin: 0.2rem 0 0;
+  color: rgba(247, 245, 237, 0.55);
+  font-size: 0.62rem;
+  line-height: 1.4;
 }

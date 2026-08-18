@@ -113,6 +113,9 @@ export default function GameControls({
             <b>Dealer busts {Math.round(actionEvs.dealerBust * 100)}%</b>
           </div>
           <p>{evCaption()}</p>
+          {evFor('split') !== null && (
+            <p className="ev-footnote">Split EV assumes you play both hands well afterwards (resplitting only when it pays). Some published tables assume automatic resplits, which drags 10,10 and 5,5 splits far lower.</p>
+          )}
         </div>
       )}
 
