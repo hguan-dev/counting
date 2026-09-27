@@ -71,8 +71,12 @@ export default function BetSpreadLab({
     onSpreadChange(optimizeBetSpread({ maxBet, rules, sitOutBelow: sitOut ? -1 : null }));
   };
 
+  // Sharpe alone always prefers a wider spread, so the bankroll's Kelly top
+  // bet sets the max and the optimizer shapes the ramp under it.
   const applySharpe = () => {
-    onSpreadChange(optimizeSharpeSpread({ maxBet, rules, sitOutBelow: sitOut ? -1 : null }));
+    const topBet = Math.max(BET_UNIT, kellyMaxBet);
+    setMaxBet(topBet);
+    onSpreadChange(optimizeSharpeSpread({ maxBet: topBet, rules, sitOutBelow: sitOut ? -1 : null }));
   };
 
   const sharpe = getSpreadSharpe(spread, rules);
@@ -175,9 +179,9 @@ export default function BetSpreadLab({
             Build ramp from these rules
           </button>
           <button
-            className="spread-apply"
+            className="spread-apply is-primary"
             onClick={applySharpe}
-            title="The ramp with the highest EV per unit of risk between $25 and the max bet"
+            title="Sets the max bet from your bankroll and Kelly fraction, then builds the ramp with the highest EV per unit of risk under it"
           >
             Max Sharpe ramp
           </button>
@@ -196,6 +200,10 @@ export default function BetSpreadLab({
           <span>Std dev / hour</span>
           <strong>±{formatMoney(result.sdPerHour)}</strong>
         </div>
+        <div className={sharpe > 0 ? 'is-positive' : 'is-negative'}>
+          <span>Sharpe · per hour / hand</span>
+          <strong>{(sharpe * Math.sqrt(handsPerHour)).toFixed(3)} · {sharpe.toFixed(4)}</strong>
+        </div>
         <div>
           <span>Avg bet · edge</span>
           <strong>{formatMoney(result.averageBet)} · {formatPercent(result.averageEdgePercent, 2)}</strong>
@@ -205,12 +213,8 @@ export default function BetSpreadLab({
           <strong>{result.riskOfRuin >= 0.995 ? '~100%' : `${(result.riskOfRuin * 100).toFixed(1)}%`}</strong>
         </div>
         <div>
-          <span>N₀ (hours to 1 SD)</span>
-          <strong>{Number.isFinite(result.n0Hours) ? `${Math.round(result.n0Hours).toLocaleString()} h` : '—'}</strong>
-        </div>
-        <div className={sharpe > 0 ? '' : 'is-negative'}>
-          <span>Spread · Sharpe / 100 hands</span>
-          <strong>1 : {Math.max(1, Math.round(maxSpreadBet / minSpreadBet))} · {(sharpe * 10).toFixed(2)}</strong>
+          <span>Spread · N₀ (hours to 1 SD)</span>
+          <strong>1 : {Math.max(1, Math.round(maxSpreadBet / minSpreadBet))} · {Number.isFinite(result.n0Hours) ? `${Math.round(result.n0Hours).toLocaleString()} h` : '—'}</strong>
         </div>
       </section>
 
@@ -260,7 +264,7 @@ export default function BetSpreadLab({
       </div>
 
       <p className="spread-note">
-        The frequency column comes from the count math for {rules.decks} deck{rules.decks === 1 ? '' : 's'} at {Math.round(rules.penetration * 100)}% penetration — deeper cuts and fewer decks put more hands in the high counts. The edge column is computed by the same EV engine that grades your play: it re-evaluates every starting hand for these rules at each true count (with count-aware play, naturals paid at {rules.blackjackPayout === 1.2 ? '6:5' : '3:2'}), anchored at TC 0 to the published {houseEdge.toFixed(2)}% house edge. Risk of ruin assumes no stop-loss and no bankroll growth. The max Sharpe ramp maximizes EV per unit of standard deviation between $25 and your max bet, which also makes it the ramp that earns the most at any fixed risk of ruin. The bet-sizing guard at the table uses this exact spread. Wagers you enter here are rounded to $25 units.
+        The frequency column comes from the count math for {rules.decks} deck{rules.decks === 1 ? '' : 's'} at {Math.round(rules.penetration * 100)}% penetration — deeper cuts and fewer decks put more hands in the high counts. The edge column is computed by the same EV engine that grades your play: it re-evaluates every starting hand for these rules at each true count (with count-aware play, naturals paid at {rules.blackjackPayout === 1.2 ? '6:5' : '3:2'}), anchored at TC 0 to the published {houseEdge.toFixed(2)}% house edge. Risk of ruin assumes no stop-loss and no bankroll growth. The max Sharpe ramp takes its top bet from your bankroll and Kelly fraction, then maximizes EV per unit of standard deviation between $25 and that top bet. The bet-sizing guard at the table uses this exact spread. Wagers you enter here are rounded to $25 units.
       </p>
     </div>
   );

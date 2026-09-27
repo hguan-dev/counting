@@ -126,6 +126,7 @@ export default function GameControls({
             onClick={onHit}
           >
             <span>Hit</span>
+            <kbd className="action-key" aria-hidden="true">H</kbd>
             {actionSub('hit')}
           </button>
           <button
@@ -133,6 +134,7 @@ export default function GameControls({
             onClick={onStand}
           >
             <span>Stand</span>
+            <kbd className="action-key" aria-hidden="true">S</kbd>
             {actionSub('stand')}
           </button>
           {canDouble && (
@@ -141,6 +143,7 @@ export default function GameControls({
               onClick={onDouble}
             >
               <span>Double</span>
+            <kbd className="action-key" aria-hidden="true">D</kbd>
               {actionSub('double')}
             </button>
           )}
@@ -150,6 +153,7 @@ export default function GameControls({
               onClick={onSplit}
             >
               <span>{canResplit ? 'Resplit' : 'Split'}</span>
+            <kbd className="action-key" aria-hidden="true">P</kbd>
               {actionSub('split')}
             </button>
           )}
@@ -159,6 +163,7 @@ export default function GameControls({
               onClick={onSurrender}
             >
               <span>Surrender</span>
+            <kbd className="action-key" aria-hidden="true">R</kbd>
               {actionSub('surrender')}
             </button>
           )}

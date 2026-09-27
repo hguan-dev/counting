@@ -1787,7 +1787,7 @@ export default function App() {
             >${c >= 1000 ? `${c / 1000}K` : c}</div>
           ))}
         </div>
-        <div style={{ fontSize: small ? '0.62rem' : '0.8rem', fontWeight: '600', color: '#f1c40f' }}>${amount}</div>
+        <div style={{ fontSize: small ? '0.62rem' : '0.8rem', fontWeight: '600', color: 'var(--brass-light)' }}>${amount}</div>
       </div>
     );
   };
@@ -1875,8 +1875,7 @@ export default function App() {
   return (
     <main className="app-shell" style={{
       position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
-      background: 'radial-gradient(circle at center, #0f4c20 0%, #072a12 70%, #031408 100%)', 
-      color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', 
+      color: 'var(--bone)',
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.4rem 2.25rem 1.5rem', boxSizing: 'border-box',
       overflow: 'hidden', userSelect: 'none'
     }}>
@@ -2241,7 +2240,7 @@ export default function App() {
             <div className="hand-zone dealer-zone shuffle-layout-spacer" aria-hidden="true">
               <div className="zone-label"><span>Dealer</span><strong>—</strong></div>
               <div className="card-row dealer-cards">
-                <div className="shoe-placeholder"><span>♠</span><small>SHOE READY</small></div>
+                <div className="shoe-placeholder"><span>♠</span><small>Shoe ready</small></div>
               </div>
             </div>
             <div className="hand-zone player-zone shuffle-layout-spacer" aria-hidden="true">
@@ -2287,7 +2286,7 @@ export default function App() {
                 {gameState === 'betting' ? (
                   <div className="shoe-placeholder">
                     <span>♠</span>
-                    <small>SHOE READY</small>
+                    <small>Shoe ready</small>
                   </div>
                 ) : (
                   dealerHand.map((card, i) => {
