@@ -3796,7 +3796,7 @@ button:disabled {
 .spread-actions {
   display: grid;
   gap: 0.5rem;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: 1.3fr 1.3fr 1fr;
 }
 
 .spread-random {

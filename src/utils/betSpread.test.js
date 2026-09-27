@@ -4,9 +4,11 @@ import {
   evaluateBetSpread,
   getKellyMaxBet,
   getSpreadBet,
+  getSpreadSharpe,
   getTrueCountDistribution,
   normalizeBetSpread,
   optimizeBetSpread,
+  optimizeSharpeSpread,
   randomBetSpread,
   SPREAD_TRUE_COUNTS,
 } from './betSpread';
@@ -150,5 +152,42 @@ describe('bet spread evaluation', () => {
     expect(getSpreadBet(spread, 12)).toBe(spread['6']);
     expect(getSpreadBet(spread, -9)).toBe(spread['-2']);
     expect(getSpreadBet(spread, 2.4)).toBe(50);
+  });
+
+  test('the max Sharpe ramp matches a brute-force search over every monotone ramp', () => {
+    [DEFAULT_RULES, { ...DEFAULT_RULES, decks: 2, penetration: 0.65 }].forEach((rules) => {
+      const units = 8;
+      let best = -Infinity;
+      const walk = (index, low, bets) => {
+        if (index === SPREAD_TRUE_COUNTS.length) {
+          const spread = Object.fromEntries(SPREAD_TRUE_COUNTS.map((tc, i) => [String(tc), bets[i] * 25]));
+          best = Math.max(best, getSpreadSharpe(spread, rules));
+          return;
+        }
+        for (let unit = low; unit <= units; unit += 1) walk(index + 1, unit, [...bets, unit]);
+      };
+      walk(0, 1, []);
+      const spread = optimizeSharpeSpread({ maxBet: units * 25, rules });
+      expect(getSpreadSharpe(spread, rules)).toBeCloseTo(best, 10);
+    });
+  });
+
+  test('the max Sharpe ramp beats the edge-proportional builder at equal risk', () => {
+    const base = { bankroll: 20000, handsPerHour: 100, rules: DEFAULT_RULES };
+    const sharpe = optimizeSharpeSpread({ maxBet: 300, rules: DEFAULT_RULES });
+    const builder = optimizeBetSpread({ maxBet: 300, rules: DEFAULT_RULES });
+    expect(getSpreadSharpe(sharpe, DEFAULT_RULES)).toBeGreaterThan(getSpreadSharpe(builder, DEFAULT_RULES));
+    expect(evaluateBetSpread({ ...base, spread: sharpe }).n0).toBeLessThan(evaluateBetSpread({ ...base, spread: builder }).n0);
+    expect(sharpe['1']).toBe(25);
+    expect(sharpe['6']).toBe(300);
+    let previous = 0;
+    SPREAD_TRUE_COUNTS.forEach((tc) => {
+      expect(sharpe[String(tc)]).toBeGreaterThanOrEqual(previous);
+      expect(sharpe[String(tc)] % 25).toBe(0);
+      previous = sharpe[String(tc)];
+    });
+    const wong = optimizeSharpeSpread({ maxBet: 300, rules: DEFAULT_RULES, sitOutBelow: -1 });
+    expect(wong['-1']).toBe(0);
+    expect(wong['0']).toBe(25);
   });
 });

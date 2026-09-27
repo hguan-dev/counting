@@ -5,9 +5,11 @@ import {
   evaluateBetSpread,
   formatMoney,
   getKellyMaxBet,
+  getSpreadSharpe,
   HANDS_PER_HOUR_BY_SEATS,
   normalizeBetSpread,
   optimizeBetSpread,
+  optimizeSharpeSpread,
   randomBetSpread,
   SPREAD_MAX_TC,
   SPREAD_MIN_TC,
@@ -68,6 +70,12 @@ export default function BetSpreadLab({
   const applyOptimized = () => {
     onSpreadChange(optimizeBetSpread({ maxBet, rules, sitOutBelow: sitOut ? -1 : null }));
   };
+
+  const applySharpe = () => {
+    onSpreadChange(optimizeSharpeSpread({ maxBet, rules, sitOutBelow: sitOut ? -1 : null }));
+  };
+
+  const sharpe = getSpreadSharpe(spread, rules);
 
   const applyRandom = () => {
     onSpreadChange(randomBetSpread({ maxBet, sitOutBelow: sitOut ? -1 : null }));
@@ -166,6 +174,13 @@ export default function BetSpreadLab({
           <button className="spread-apply" onClick={applyOptimized}>
             Build ramp from these rules
           </button>
+          <button
+            className="spread-apply"
+            onClick={applySharpe}
+            title="The ramp with the highest EV per unit of risk between $25 and the max bet"
+          >
+            Max Sharpe ramp
+          </button>
           <button className="spread-random" onClick={applyRandom} title="A random non-decreasing ramp up to the max bet">
             Random ramp
           </button>
@@ -193,9 +208,9 @@ export default function BetSpreadLab({
           <span>N₀ (hours to 1 SD)</span>
           <strong>{Number.isFinite(result.n0Hours) ? `${Math.round(result.n0Hours).toLocaleString()} h` : '—'}</strong>
         </div>
-        <div>
-          <span>Spread</span>
-          <strong>1 : {Math.max(1, Math.round(maxSpreadBet / minSpreadBet))}</strong>
+        <div className={sharpe > 0 ? '' : 'is-negative'}>
+          <span>Spread · Sharpe / 100 hands</span>
+          <strong>1 : {Math.max(1, Math.round(maxSpreadBet / minSpreadBet))} · {(sharpe * 10).toFixed(2)}</strong>
         </div>
       </section>
 
@@ -245,7 +260,7 @@ export default function BetSpreadLab({
       </div>
 
       <p className="spread-note">
-        The frequency column comes from the count math for {rules.decks} deck{rules.decks === 1 ? '' : 's'} at {Math.round(rules.penetration * 100)}% penetration — deeper cuts and fewer decks put more hands in the high counts. The edge column is computed by the same EV engine that grades your play: it re-evaluates every starting hand for these rules at each true count (with count-aware play, naturals paid at {rules.blackjackPayout === 1.2 ? '6:5' : '3:2'}), anchored at TC 0 to the published {houseEdge.toFixed(2)}% house edge. Risk of ruin assumes no stop-loss and no bankroll growth. The bet-sizing guard at the table uses this exact spread. Wagers you enter here are rounded to $25 units.
+        The frequency column comes from the count math for {rules.decks} deck{rules.decks === 1 ? '' : 's'} at {Math.round(rules.penetration * 100)}% penetration — deeper cuts and fewer decks put more hands in the high counts. The edge column is computed by the same EV engine that grades your play: it re-evaluates every starting hand for these rules at each true count (with count-aware play, naturals paid at {rules.blackjackPayout === 1.2 ? '6:5' : '3:2'}), anchored at TC 0 to the published {houseEdge.toFixed(2)}% house edge. Risk of ruin assumes no stop-loss and no bankroll growth. The max Sharpe ramp maximizes EV per unit of standard deviation between $25 and your max bet, which also makes it the ramp that earns the most at any fixed risk of ruin. The bet-sizing guard at the table uses this exact spread. Wagers you enter here are rounded to $25 units.
       </p>
     </div>
   );

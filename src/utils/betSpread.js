@@ -178,8 +178,108 @@ export const optimizeBetSpread = ({
   return spread;
 };
 
+const spreadSharpe = (spread, rows) => {
+  let mean = 0;
+  let square = 0;
+  rows.forEach(({ tc, probability, edge }) => {
+    const bet = spread[String(tc)];
+    mean += probability * bet * edge;
+    square += probability * bet * bet;
+  });
+  return square > 0 ? mean / Math.sqrt(HAND_VARIANCE * square) : -Infinity;
+};
+
 /**
- * A random non-decreasing ramp: table minimum through +1, then random rungs
+ * The ramp with the highest per-hand Sharpe ratio (EV / SD, Schlesinger's
+ * desirability index) given a minimum and maximum bet. For a fixed risk of
+ * ruin, EV/hour is proportional to Sharpe², so this is also the ramp that
+ * earns the most at any chosen level of risk.
+ *
+ * Setting ∂S/∂bᵢ = 0 gives bᵢ = c·eᵢ with c = Σpb² / Σpbe, so with bet
+ * limits the continuous optimum is bᵢ = clip(c·eᵢ, min, max) for a single
+ * scalar c. On the $25 grid, every c yields the rounded ramp that maximizes
+ * EV − γ·variance for some γ, so scanning each c where a rung changes finds
+ * the best of those exactly. A coordinate-ascent pass then checks single-rung
+ * moves the scan can't reach. The result is exact whenever some ramp within
+ * the limits has positive EV. When none does (6:5 with a narrow spread), the
+ * least-bad ratio is not meaningful and the result is only a local best.
+ */
+export const optimizeSharpeSpread = ({
+  maxBet = 300,
+  minBet = BET_UNIT,
+  rules,
+  sitOutBelow = null,
+}) => {
+  const toUnit = value => Math.round(value / BET_UNIT) * BET_UNIT;
+  const cappedMax = Math.max(BET_UNIT, Math.min(TABLE_MAX_BET, toUnit(maxBet)));
+  const floorBet = Math.min(cappedMax, Math.max(BET_UNIT, toUnit(minBet)));
+  const distribution = getTrueCountDistribution(rules.decks, rules.penetration);
+  const rows = SPREAD_TRUE_COUNTS.map(tc => ({
+    edge: getPlayerEdgePercent(rules, representativeTrueCount(tc)) / 100,
+    probability: distribution[String(tc)],
+    tc,
+  }));
+
+  const rampFor = c => Object.fromEntries(rows.map(({ tc, edge }) => {
+    if (sitOutBelow !== null && tc <= sitOutBelow) return [String(tc), 0];
+    return [String(tc), Math.min(cappedMax, Math.max(floorBet, toUnit(c * edge)))];
+  }));
+
+  // Every c at which some rung rounds to a different unit.
+  const positive = rows.filter(row => row.edge > 0);
+  const breakpoints = [0];
+  positive.forEach(({ edge }) => {
+    for (let bet = floorBet; bet <= cappedMax; bet += BET_UNIT) breakpoints.push((bet + BET_UNIT / 2) / edge);
+  });
+  breakpoints.sort((a, b) => a - b);
+  const candidates = breakpoints.map((c, index) => (
+    index + 1 < breakpoints.length ? (c + breakpoints[index + 1]) / 2 : c * 1.01
+  ));
+
+  let best = null;
+  let bestSharpe = -Infinity;
+  candidates.forEach((c) => {
+    const spread = rampFor(c);
+    const sharpe = spreadSharpe(spread, rows);
+    if (sharpe > bestSharpe + 1e-12) {
+      best = spread;
+      bestSharpe = sharpe;
+    }
+  });
+
+  let improved = true;
+  while (improved) {
+    improved = false;
+    rows.forEach(({ tc }) => {
+      const key = String(tc);
+      const current = best[key];
+      const moves = current === 0 ? [] : [current - BET_UNIT, current + BET_UNIT];
+      moves.forEach((bet) => {
+        if (bet < floorBet || bet > cappedMax) return;
+        const trial = { ...best, [key]: bet };
+        const sharpe = spreadSharpe(trial, rows);
+        if (sharpe > bestSharpe + 1e-12) {
+          best = trial;
+          bestSharpe = sharpe;
+          improved = true;
+        }
+      });
+    });
+  }
+  return best;
+};
+
+export const getSpreadSharpe = (spread, rules) => {
+  const distribution = getTrueCountDistribution(rules.decks, rules.penetration);
+  return spreadSharpe(spread, SPREAD_TRUE_COUNTS.map(tc => ({
+    edge: getPlayerEdgePercent(rules, representativeTrueCount(tc)) / 100,
+    probability: distribution[String(tc)],
+    tc,
+  })));
+};
+
+/**
+ * A random non-decreasing ramp:table minimum through +1, then random rungs
  * that never fall as the count rises, topping out at (or below) `maxBet`.
  * Useful for exploring how spread shape moves EV and risk.
  */
