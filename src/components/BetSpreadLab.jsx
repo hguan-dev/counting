@@ -4,7 +4,6 @@ import { BET_UNIT, TABLE_MAX_BET } from '../utils/betSizing';
 import {
   evaluateBetSpread,
   formatMoney,
-  getKellyMaxBet,
   getSpreadSharpe,
   HANDS_PER_HOUR_BY_SEATS,
   normalizeBetSpread,
@@ -16,12 +15,6 @@ import {
 } from '../utils/betSpread';
 import { describeRules, getHouseEdgePercent } from '../utils/tableRules';
 import { getEdgePerTrueCount, getPlayerEdgePercent } from '../utils/advantageCurve';
-
-const KELLY_OPTIONS = [
-  [1, 'Full Kelly', 'Max growth, wild swings'],
-  [0.5, 'Half Kelly', 'The usual pro choice'],
-  [0.25, 'Quarter Kelly', 'Sleep well'],
-];
 
 const formatTc = tc => (
   tc === SPREAD_MIN_TC ? `≤ ${tc}` : tc === SPREAD_MAX_TC ? `≥ +${tc}` : tc > 0 ? `+${tc}` : String(tc)
@@ -40,7 +33,6 @@ export default function BetSpreadLab({
   const [labBankroll, setLabBankroll] = useState(() => Math.max(10000, Math.round(bankroll)));
   const [handsPerHour, setHandsPerHour] = useState(() => HANDS_PER_HOUR_BY_SEATS[aiSeatCount] ?? 130);
   const [maxBet, setMaxBet] = useState(300);
-  const [kellyFraction, setKellyFraction] = useState(0.5);
   const [sitOut, setSitOut] = useState(false);
 
   const result = useMemo(() => evaluateBetSpread({
@@ -65,18 +57,12 @@ export default function BetSpreadLab({
     onSpreadChange(normalizeBetSpread({ ...spread, [String(tc)]: value }));
   };
 
-  const kellyMaxBet = getKellyMaxBet({ bankroll: labBankroll, kellyFraction, rules });
-
   const applyOptimized = () => {
     onSpreadChange(optimizeBetSpread({ maxBet, rules, sitOutBelow: sitOut ? -1 : null }));
   };
 
-  // Sharpe alone always prefers a wider spread, so the bankroll's Kelly top
-  // bet sets the max and the optimizer shapes the ramp under it.
   const applySharpe = () => {
-    const topBet = Math.max(BET_UNIT, kellyMaxBet);
-    setMaxBet(topBet);
-    onSpreadChange(optimizeSharpeSpread({ maxBet: topBet, rules, sitOutBelow: sitOut ? -1 : null }));
+    onSpreadChange(optimizeSharpeSpread({ maxBet, rules, sitOutBelow: sitOut ? -1 : null }));
   };
 
   const sharpe = getSpreadSharpe(spread, rules);
@@ -142,34 +128,6 @@ export default function BetSpreadLab({
       </section>
 
       <section className="spread-optimizer">
-        <div className="spread-kelly" role="radiogroup" aria-label="Kelly fraction">
-          {KELLY_OPTIONS.map(([value, label, detail]) => (
-            <button
-              key={value}
-              role="radio"
-              aria-checked={kellyFraction === value}
-              className={kellyFraction === value ? 'is-selected' : ''}
-              onClick={() => setKellyFraction(value)}
-            >
-              <span>{label}</span>
-              <small>{detail}</small>
-            </button>
-          ))}
-        </div>
-        <p className={`spread-kelly-hint ${kellyMaxBet < BET_UNIT ? 'is-warning' : ''}`}>
-          {kellyMaxBet >= BET_UNIT ? (
-            <>
-              For a {formatMoney(labBankroll)} bankroll, {KELLY_OPTIONS.find(([value]) => value === kellyFraction)[1].toLowerCase()} suggests a top bet of about <strong>{formatMoney(kellyMaxBet)}</strong>.
-              {kellyMaxBet !== maxBet && (
-                <button type="button" className="inline-link" onClick={() => setMaxBet(kellyMaxBet)}>Use it as max bet</button>
-              )}
-            </>
-          ) : (
-            <>
-              A {formatMoney(labBankroll)} bankroll can’t support a $25-unit spread at this Kelly fraction (it caps the top bet under $25). Raise the bankroll or accept more risk — the ramp below still builds from your max bet.
-            </>
-          )}
-        </p>
         <label className="spread-sitout">
           <input type="checkbox" checked={sitOut} onChange={() => setSitOut(!sitOut)} />
           <span>Sit out (bet $0) at TC −1 and below</span>
@@ -181,7 +139,7 @@ export default function BetSpreadLab({
           <button
             className="spread-apply is-primary"
             onClick={applySharpe}
-            title="Sets the max bet from your bankroll and Kelly fraction, then builds the ramp with the highest EV per unit of risk under it"
+            title="The ramp with the highest EV per unit of risk between $25 and the max bet"
           >
             Max Sharpe ramp
           </button>
@@ -264,7 +222,7 @@ export default function BetSpreadLab({
       </div>
 
       <p className="spread-note">
-        The frequency column comes from the count math for {rules.decks} deck{rules.decks === 1 ? '' : 's'} at {Math.round(rules.penetration * 100)}% penetration — deeper cuts and fewer decks put more hands in the high counts. The edge column is computed by the same EV engine that grades your play: it re-evaluates every starting hand for these rules at each true count (with count-aware play, naturals paid at {rules.blackjackPayout === 1.2 ? '6:5' : '3:2'}), anchored at TC 0 to the published {houseEdge.toFixed(2)}% house edge. Risk of ruin assumes no stop-loss and no bankroll growth. The max Sharpe ramp takes its top bet from your bankroll and Kelly fraction, then maximizes EV per unit of standard deviation between $25 and that top bet. The bet-sizing guard at the table uses this exact spread. Wagers you enter here are rounded to $25 units.
+        The frequency column comes from the count math for {rules.decks} deck{rules.decks === 1 ? '' : 's'} at {Math.round(rules.penetration * 100)}% penetration — deeper cuts and fewer decks put more hands in the high counts. The edge column is computed by the same EV engine that grades your play: it re-evaluates every starting hand for these rules at each true count (with count-aware play, naturals paid at {rules.blackjackPayout === 1.2 ? '6:5' : '3:2'}), anchored at TC 0 to the published {houseEdge.toFixed(2)}% house edge. Risk of ruin assumes no stop-loss and no bankroll growth. The max Sharpe ramp maximizes EV per unit of standard deviation between $25 and your max bet, which also makes it the ramp that earns the most at any fixed risk of ruin. The bet-sizing guard at the table uses this exact spread. Wagers you enter here are rounded to $25 units.
       </p>
     </div>
   );

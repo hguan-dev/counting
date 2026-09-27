@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import {
   DEFAULT_BET_SPREAD,
   evaluateBetSpread,
-  getKellyMaxBet,
   getSpreadBet,
   getSpreadSharpe,
   getTrueCountDistribution,
@@ -113,15 +112,6 @@ describe('bet spread evaluation', () => {
       previous = spread[String(tc)];
     });
     expect(spread['6']).toBe(500);
-  });
-
-  test('Kelly max bet scales with bankroll and fraction', () => {
-    expect(getKellyMaxBet({ bankroll: 1000, kellyFraction: 0.5, rules: DEFAULT_RULES })).toBeLessThanOrEqual(25);
-    const half = getKellyMaxBet({ bankroll: 20000, kellyFraction: 0.5, rules: DEFAULT_RULES });
-    const full = getKellyMaxBet({ bankroll: 20000, kellyFraction: 1, rules: DEFAULT_RULES });
-    expect(half).toBeGreaterThan(100);
-    expect(full).toBeGreaterThan(half);
-    expect(full % 25).toBe(0);
   });
 
   test('random ramps are monotonic, hit the max bet, and vary', () => {

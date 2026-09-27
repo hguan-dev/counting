@@ -128,19 +128,6 @@ export const evaluateBetSpread = ({
 };
 
 /**
- * The Kelly-optimal top bet for a bankroll: at the highest count, bet
- * kellyFraction × edge / variance × bankroll. This is advice about how big the
- * ramp's top rung should be for the bankroll — the ramp shape itself comes
- * from optimizeBetSpread.
- */
-export const getKellyMaxBet = ({ bankroll, kellyFraction = 0.5, rules }) => {
-  const topEdge = getPlayerEdgePercent(rules, representativeTrueCount(SPREAD_MAX_TC)) / 100;
-  if (topEdge <= 0) return 0;
-  const raw = (kellyFraction * topEdge / HAND_VARIANCE) * bankroll;
-  return Math.max(0, Math.round(raw / BET_UNIT) * BET_UNIT);
-};
-
-/**
  * Build a ramp for the rules: bets scale with the player's edge at each true
  * count (the Kelly-optimal shape), anchored so the top count gets `maxBet`
  * and non-advantage counts get the table minimum (or sit out). Rounded to the
