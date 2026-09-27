@@ -5,7 +5,6 @@ import {
   PAYOUT_OPTIONS,
   PENETRATION_OPTIONS,
 } from '../utils/tableRules';
-import { ACHIEVEMENTS, getRank } from '../utils/profile';
 import { summarizeHistory } from '../utils/sessionHistory';
 
 const formatSigned = value => `${value >= 0 ? '+' : '−'}$${Math.abs(Math.round(value)).toLocaleString()}`;
@@ -44,6 +43,9 @@ export default function SettingsDrawer({
   showStrategyPopups,
   onStrategyPopupsChange,
   tablePace,
+  dealMs = 800,
+  dealSpeeds = [],
+  onDealMsChange,
   onTablePaceChange,
   countDrillEnabled,
   onCountDrillChange,
@@ -53,7 +55,6 @@ export default function SettingsDrawer({
   rules,
   onRulesChange,
   rulesLocked = false,
-  profile,
   sessionStatus,
   onResetSession,
   history = [],
@@ -61,14 +62,6 @@ export default function SettingsDrawer({
   onViewLiveSession,
   soundEnabled,
   onSoundChange,
-  speechEnabled,
-  onSpeechChange,
-  kokoroVoices,
-  selectedVoiceName,
-  onVoiceChange,
-  voiceModelStatus,
-  voiceModelProgress,
-  onPreviewVoice,
   onExportLog,
 }) {
   useEffect(() => {
@@ -80,20 +73,9 @@ export default function SettingsDrawer({
   }, [onClose]);
 
   const [confirmReset, setConfirmReset] = useState(false);
-  const rank = getRank(profile?.xp || 0);
-  const lifetimeAccuracy = profile?.decisions
-    ? Math.round(((profile.decisions - profile.mistakes) / profile.decisions) * 100)
-    : 0;
-  const unlocked = ACHIEVEMENTS.filter(achievement => achievement.unlocked(profile || {}));
   const analytics = summarizeHistory(history);
   const recentSessions = [...history].reverse().slice(0, 12);
   const formatDate = timestamp => (timestamp ? new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—');
-
-  const voiceStatusLabel = voiceModelStatus === 'loading'
-    ? `Loading voice model ${voiceModelProgress ? `· ${voiceModelProgress}%` : '…'}`
-    : voiceModelStatus === 'warming'
-      ? 'AI voice retrying — using system voice'
-      : 'AI voice ready';
 
   return (
     <>
@@ -105,43 +87,6 @@ export default function SettingsDrawer({
         </div>
 
         <div className="settings-content">
-          <section className="profile-section">
-            <div className="profile-rank">
-              <div className="profile-badge" aria-hidden="true">{rank.level}</div>
-              <div className="profile-rank-copy">
-                <span>Rank {rank.level} of 8</span>
-                <strong>{rank.current.title}</strong>
-                <div className="profile-xp" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(rank.progress * 100)}>
-                  <i style={{ width: `${Math.round(rank.progress * 100)}%` }} />
-                </div>
-                <small>
-                  {rank.next
-                    ? `${(profile?.xp || 0).toLocaleString()} XP · ${(rank.next.minXp - (profile?.xp || 0)).toLocaleString()} to ${rank.next.title}`
-                    : `${(profile?.xp || 0).toLocaleString()} XP · top rank`}
-                </small>
-              </div>
-            </div>
-            <div className="profile-stats">
-              <div><span>Hands</span><strong>{(profile?.handsPlayed || 0).toLocaleString()}</strong></div>
-              <div><span>Accuracy</span><strong>{lifetimeAccuracy}%</strong></div>
-              <div><span>Best streak</span><strong>{profile?.bestStreak || 0}</strong></div>
-              <div><span>Count calls</span><strong>{profile?.drillExact || 0}/{profile?.drillAttempts || 0}</strong></div>
-              <div><span>Shoes</span><strong>{profile?.shoesCompleted || 0}</strong></div>
-              <div><span>Best session</span><strong>{formatSigned(profile?.bestSessionPnl || 0)}</strong></div>
-            </div>
-            <div className="profile-achievements" aria-label={`${unlocked.length} of ${ACHIEVEMENTS.length} achievements unlocked`}>
-              {ACHIEVEMENTS.map((achievement) => {
-                const done = achievement.unlocked(profile || {});
-                return (
-                  <div key={achievement.id} className={`achievement ${done ? 'is-unlocked' : ''}`} title={achievement.description}>
-                    <i aria-hidden="true">{done ? '★' : '☆'}</i>
-                    <span>{achievement.title}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
           <section>
             <h3>History &amp; analytics</h3>
             <div className="profile-stats">
@@ -183,7 +128,7 @@ export default function SettingsDrawer({
               <div><span>Hands</span><strong>{sessionStatus?.hands || 0}</strong></div>
               <div><span>Accuracy</span><strong>{sessionStatus?.accuracyRate || 0}%</strong></div>
               <div><span>Buy-ins</span><strong>${Math.round(sessionStatus?.buyIns || 0).toLocaleString()}</strong></div>
-              <div><span>Session #</span><strong>{profile?.sessions || 1}</strong></div>
+              <div><span>Count calls</span><strong>{drillStats?.exact || 0}/{drillStats?.attempts || 0}</strong></div>
             </div>
             {!confirmReset ? (
               <button className="settings-export is-danger" onClick={() => setConfirmReset(true)} disabled={rulesLocked}>
@@ -191,7 +136,7 @@ export default function SettingsDrawer({
               </button>
             ) : (
               <div className="reset-confirm">
-                <span>Bankroll back to $1,000, history cleared, fresh shoe. Your rank and lifetime stats stay.</span>
+                <span>Bankroll back to $1,000, history cleared, fresh shoe. Your session history stays.</span>
                 <div>
                   <button className="settings-export is-danger" onClick={() => { setConfirmReset(false); onResetSession(); }}>Yes, reset</button>
                   <button className="settings-export" onClick={() => setConfirmReset(false)}>Keep playing</button>
@@ -242,7 +187,7 @@ export default function SettingsDrawer({
             <div className="pace-field">
               <div className="setting-copy">
                 <strong>Table companions</strong>
-                <span>Other players at the table — more cards to count, dealt at the table pace below.</span>
+                <span>Other players at the table — more cards to count, dealt at your deal speed.</span>
               </div>
               <div className="pace-options is-seats" role="radiogroup" aria-label="Table companions">
                 {[[0, 'Just you', 'Heads-up'], [2, '+2 players', 'Lena & Walt'], [4, '+4 players', 'Full table']].map(([value, label, detail]) => (
@@ -261,8 +206,28 @@ export default function SettingsDrawer({
             </div>
             <div className="pace-field">
               <div className="setting-copy">
+                <strong>Deal speed</strong>
+                <span>Time per card dealt, for you, the dealer, and every seat.</span>
+              </div>
+              <div className="pace-options" role="radiogroup" aria-label="Deal speed">
+                {dealSpeeds.map(value => (
+                  <button
+                    key={value}
+                    role="radio"
+                    aria-checked={dealMs === value}
+                    className={dealMs === value ? 'is-selected' : ''}
+                    onClick={() => onDealMsChange(value)}
+                  >
+                    <span>{(value / 1000).toFixed(1)}s</span>
+                    <small>{value === 800 ? 'Default' : value < 800 ? 'Faster' : 'Slower'}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="pace-field">
+              <div className="setting-copy">
                 <strong>Table pace</strong>
-                <span>How quickly companions act and cards are swept after payouts.</span>
+                <span>How quickly cards are swept after payouts.</span>
               </div>
               <div className="pace-options" role="radiogroup" aria-label="Table pace">
                 {TABLE_PACE_OPTIONS.map(([value, label, detail]) => (
@@ -282,42 +247,7 @@ export default function SettingsDrawer({
           </section>
 
           <section>
-            <h3>Dealer voice</h3>
-            <SettingRow
-              label="Spoken announcements"
-              description="The dealer calls cards, totals, and results out loud."
-              checked={speechEnabled}
-              onChange={() => onSpeechChange(!speechEnabled)}
-            />
-            {speechEnabled && kokoroVoices.length > 0 && (
-              <div className="voice-settings">
-                <label className="setting-field">
-                  <span>AI voice</span>
-                  <select
-                    value={selectedVoiceName}
-                    onChange={event => onVoiceChange(event.target.value)}
-                  >
-                    {kokoroVoices.map(voice => (
-                      <option key={voice.id} value={`kokoro:${voice.id}`}>
-                        {voice.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className={`voice-model-status is-${voiceModelStatus}`}>
-                  <span className="voice-model-dot" aria-hidden="true" />
-                  <span>{voiceStatusLabel}</span>
-                  {voiceModelStatus === 'loading' && (
-                    <span className="voice-model-bar" aria-hidden="true">
-                      <i style={{ width: `${voiceModelProgress}%` }} />
-                    </span>
-                  )}
-                  <button className="voice-preview" onClick={onPreviewVoice}>
-                    Preview
-                  </button>
-                </div>
-              </div>
-            )}
+            <h3>Sound</h3>
             <SettingRow
               label="Sound effects"
               description="Card, chip, and result sounds."

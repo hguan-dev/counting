@@ -1,38 +1,11 @@
 import { useState } from 'react';
-import { Card } from '../models/Card';
 import PlayingCard from './PlayingCard';
-import { calculateTotal, getDetailedPlay, isSoftHand } from '../utils/strategyEngine';
+import { calculateTotal, isSoftHand } from '../utils/strategyEngine';
+import { buildQuizScenario } from '../utils/quizScenarios';
 import { computeActionEvs, formatEv } from '../utils/actionEv';
 
-const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-const SUITS = ['♠', '♥', '♦', '♣'];
-
-const randomItem = items => items[Math.floor(Math.random() * items.length)];
-const randomCard = value => new Card(randomItem(SUITS), value ?? randomItem(VALUES));
-
-const buildScenario = (rules) => {
-  for (;;) {
-    const trueCount = Math.floor(Math.random() * 9) - 3;
-    const dealerCard = randomCard();
-    const roll = Math.random();
-    let cards;
-    if (roll < 0.25) {
-      const value = randomItem(VALUES);
-      cards = [randomCard(value), randomCard(value)];
-    } else if (roll < 0.5) {
-      cards = [randomCard('A'), randomCard(randomItem(['2', '3', '4', '5', '6', '7', '8', '9']))];
-    } else {
-      cards = [randomCard(), randomCard()];
-    }
-    if (calculateTotal(cards) === 21) continue;
-
-    const evaluation = getDetailedPlay(cards, dealerCard, trueCount, { rules });
-    return { cards, dealerCard, evaluation, trueCount };
-  }
-};
-
 export default function StrategyQuiz({ rules }) {
-  const [scenario, setScenario] = useState(() => buildScenario(rules));
+  const [scenario, setScenario] = useState(() => buildQuizScenario(rules));
   const [answer, setAnswer] = useState(null);
   const [streak, setStreak] = useState(0);
   const [score, setScore] = useState({ correct: 0, total: 0 });
@@ -75,7 +48,7 @@ export default function StrategyQuiz({ rules }) {
   };
 
   const nextHand = () => {
-    setScenario(buildScenario(rules));
+    setScenario(buildQuizScenario(rules));
     setAnswer(null);
   };
 

@@ -6,12 +6,6 @@ import DeviationChart from './DeviationChart';
 import { DEVIATION_GUIDE_GROUPS } from '../utils/deviations';
 import { describeRules } from '../utils/tableRules';
 
-const countRows = [
-  ['2–6', '+1', 'Low cards leaving the shoe favor the player'],
-  ['7–9', '0', 'Neutral'],
-  ['10–A', '−1', 'High cards leaving the shoe favor the house'],
-];
-
 function GuideTable({ rows, headings }) {
   return (
     <div className="guide-table-wrap">
@@ -44,7 +38,6 @@ export default function CheatSheet({
   const tabs = [
     ['strategy', 'Strategy'],
     ['spread', 'Bet spread'],
-    ['counting', 'Counting'],
     ['quiz', 'Quiz'],
     ['rules', 'How to play'],
   ];
@@ -180,17 +173,6 @@ export default function CheatSheet({
               </ul>
             </details>
 
-            <details>
-              <summary>Voice mode & vision-free play</summary>
-              <ul className="guide-list">
-                <li>Enable <strong>Voice mode</strong> once, then say “help” at any time.</li>
-                <li>Configure unequal wagers naturally: “two spots, bet 25 and 50.”</li>
-                <li>Every round decision is supported: hit, stand, double, split, surrender, insurance, even money, and next round.</li>
-                <li>Say “status,” “bankroll,” or “count” to hear the current table state.</li>
-                <li>Say “microphone test” to confirm that speech is detected, transcribed, and matched end to end.</li>
-                <li>Spoken prompts pause microphone listening while the dealer talks, then resume automatically.</li>
-              </ul>
-            </details>
           </>
         )}
 
@@ -207,69 +189,6 @@ export default function CheatSheet({
           </>
         )}
 
-        {activeTab === 'counting' && (
-          <>
-            <section className="guide-callout">
-              <span className="guide-callout-icon">±</span>
-              <div>
-                <strong>Counting tracks composition, not the next card.</strong>
-                <p>A positive count means more tens and Aces remain than usual, improving blackjacks and successful doubles.</p>
-              </div>
-            </section>
-
-            <section>
-              <h3>Hi‑Lo tags</h3>
-              <GuideTable rows={countRows} headings={['Cards', 'Tag', 'Meaning']} />
-            </section>
-
-            <section>
-              <h3>Running count → true count</h3>
-              <div className="formula-card">
-                <span>Running count</span>
-                <b>÷</b>
-                <span>Decks remaining</span>
-                <b>=</b>
-                <span>True count</span>
-              </div>
-              <p className="section-intro">Example: +8 with about 2 decks remaining is a true count of +4. Use the true count for betting and deviations.</p>
-            </section>
-
-            <section>
-              <h3>Bet sizing</h3>
-              <p className="section-intro">Your spread lives in the <button type="button" className="inline-link" onClick={() => setActiveTab('spread')}>Bet spread</button> tab, where it is sized to the table rules and your bankroll. The bet-sizing guard at the table checks against that spread before every deal.</p>
-              <div className="risk-note">
-                <strong>Size from bankroll, not emotion.</strong>
-                <span>Keep the unit fixed for the session, raise bets only from the true count before the deal, and never chase.</span>
-              </div>
-            </section>
-
-            <section>
-              <h3>Using the ramp well</h3>
-              <ul className="guide-list">
-                <li>Raise or lower the wager from the <strong>true count before the deal</strong>, then leave it unchanged during the hand.</li>
-                <li>Keep the base unit fixed for the session. Never increase it to chase losses.</li>
-                <li>A worthwhile ramp depends on rules, penetration, accuracy, bankroll, and risk tolerance—not the count alone.</li>
-                <li>Reset the running count only when the shoe is shuffled.</li>
-              </ul>
-            </section>
-
-            <section>
-              <h3>Practice loop</h3>
-              <ol className="guide-list numbered">
-                <li>Start every fresh shoe at 0.</li>
-                <li>Tag every exposed card once.</li>
-                <li>Estimate decks remaining before converting.</li>
-                <li>Keep playing perfect basic strategy.</li>
-                <li>Use deviations only at their exact index.</li>
-              </ol>
-            </section>
-
-            <details>
-              <summary>Reality check</summary>
-              <p className="detail-copy">This ramp is a learning example, not a promise of profit or individualized financial advice. Card counting is not illegal in many jurisdictions, but casinos can refuse service and local rules vary.</p>
-            </details>
-          </>
-        )}
       </div>
 
       <div className="study-footer">

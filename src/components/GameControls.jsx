@@ -2,6 +2,7 @@ import NumberField from './NumberField';
 
 export default function GameControls({
   gameState,
+  cardInFlight = false,
   spotBets,
   setSpotBet,
   numHands,
@@ -123,6 +124,7 @@ export default function GameControls({
         <div className={`action-cluster ${actionEvs ? 'has-evs' : ''}`}>
           <button
             className={`action-button is-hit ${hintedAction === 'hit' ? 'is-hinted' : ''} ${isBest('hit') ? 'is-best-ev' : ''}`}
+            disabled={cardInFlight}
             onClick={onHit}
           >
             <span>Hit</span>
@@ -131,6 +133,7 @@ export default function GameControls({
           </button>
           <button
             className={`action-button is-stand ${hintedAction === 'stand' ? 'is-hinted' : ''} ${isBest('stand') ? 'is-best-ev' : ''}`}
+            disabled={cardInFlight}
             onClick={onStand}
           >
             <span>Stand</span>
@@ -140,6 +143,7 @@ export default function GameControls({
           {canDouble && (
             <button
               className={`action-button is-double ${hintedAction === 'double' ? 'is-hinted' : ''} ${isBest('double') ? 'is-best-ev' : ''}`}
+            disabled={cardInFlight}
               onClick={onDouble}
             >
               <span>Double</span>
@@ -150,6 +154,7 @@ export default function GameControls({
           {canSplit && (
             <button
               className={`action-button is-split ${hintedAction === 'split' ? 'is-hinted' : ''} ${isBest('split') ? 'is-best-ev' : ''}`}
+            disabled={cardInFlight}
               onClick={onSplit}
             >
               <span>{canResplit ? 'Resplit' : 'Split'}</span>
@@ -160,6 +165,7 @@ export default function GameControls({
           {canSurrender && (
             <button
               className={`action-button is-surrender ${hintedAction === 'surrender' ? 'is-hinted' : ''} ${isBest('surrender') ? 'is-best-ev' : ''}`}
+            disabled={cardInFlight}
               onClick={onSurrender}
             >
               <span>Surrender</span>

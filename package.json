@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "generate:heart-audio": "node scripts/generate-heart-audio.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -15,7 +14,6 @@
   "dependencies": {
     "@fontsource/barlow-semi-condensed": "^5.3.0",
     "@fontsource/bodoni-moda": "^5.3.0",
-    "kokoro-js": "^1.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

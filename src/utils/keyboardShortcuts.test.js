@@ -21,10 +21,6 @@ describe('getKeyboardCommand', () => {
     expect(getKeyboardCommand('c', 'playing')).toEqual({ type: 'countToggle' });
   });
 
-  it('maps V to voice mode from any game state', () => {
-    expect(getKeyboardCommand('v', 'resolved')).toEqual({ type: 'voiceMode' });
-  });
-
   it('maps I to the active ace decision', () => {
     expect(getKeyboardCommand('i', 'insurance')).toEqual({ type: 'insurance', buy: true });
     expect(getKeyboardCommand('I', 'evenMoney')).toEqual({ type: 'evenMoney', accept: true });

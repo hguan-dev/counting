@@ -26,11 +26,7 @@ import ShoeTray from './components/ShoeTray';
 import DealerShoe from './components/DealerShoe';
 import ChipRack from './components/ChipRack';
 import NumberField from './components/NumberField';
-import useTableVoice from './hooks/useTableVoice';
-import {
-  getSpokenCountSummary,
-  getSpokenHandTotal,
-} from './utils/tableSpeech';
+import useTableSounds from './hooks/useTableSounds';
 import { getKeyboardCommand } from './utils/keyboardShortcuts';
 import { BET_UNIT, isValidTableWager, TABLE_MAX_BET, TABLE_MIN_BET } from './utils/betSizing';
 import { DEFAULT_RULES, normalizeRules } from './utils/tableRules';
@@ -44,21 +40,11 @@ import { loadSessionState, saveSessionState } from './utils/persistence';
 import { loadSessionHistory, saveSessionHistory, summarizeSession } from './utils/sessionHistory';
 import { computeActionEvs } from './utils/actionEv';
 import { getAdvantageCurve } from './utils/advantageCurve';
-import {
-  loadProfile,
-  recordDecisions,
-  recordDrill,
-  recordFullTableCasinoRound,
-  recordHands,
-  recordSessionPnl,
-  recordShoe,
-  saveProfile,
-  startNewSession,
-} from './utils/profile';
 
 const TABLE_PACE_MS = { slow: 6000, medium: 3500, fast: 2000, pro: 1200 };
 const TABLE_PACES = ['manual', 'slow', 'medium', 'fast', 'pro'];
-const AI_ACTION_MS = { fast: 900, manual: 1600, medium: 1400, pro: 550, slow: 2000 };
+const DEAL_SPEEDS_MS = [400, 600, 800, 1000, 1200];
+const DEFAULT_DEAL_MS = 800;
 const AI_SEAT_COUNTS = [0, 2, 4];
 const AI_SEAT_ROSTER = [
   { name: 'Lena', position: 'pre' },
@@ -67,7 +53,6 @@ const AI_SEAT_ROSTER = [
   { name: 'Walt', position: 'post' },
 ];
 const AI_BET_OPTIONS = [25, 25, 50, 50, 75, 100];
-const DEAL_STEP_MS = 150;
 
 const getAiSeatsForCount = (count) => (
   count === 2
@@ -95,23 +80,6 @@ const isSoft17 = (cards) => {
   return hardSum === 7 && aces > 0;
 };
 
-const CONFETTI_PARTICLES = Array.from({ length: 720 }, (_, index) => ({
-  color: ['#facc15', '#fb7185', '#38bdf8', '#4ade80', '#c084fc', '#f97316'][index % 6],
-  delay: `${(index % 40) * 34}ms`,
-  drift: `${((index * 47) % 560) - 280}px`,
-  left: `${1 + ((index * 37) % 98)}%`,
-  rotation: `${360 + ((index * 83) % 1080)}deg`,
-  scale: 0.7 + (index % 7) * 0.1,
-}));
-
-const SICK_REACTION_PARTICLES = Array.from({ length: 150 }, (_, index) => ({
-  delay: `${(index % 22) * 58}ms`,
-  drift: `${((index * 61) % 460) - 230}px`,
-  emoji: index % 3 === 0 ? '🤢' : '🤮',
-  left: `${1 + ((index * 43) % 98)}%`,
-  size: `${1.8 + (index % 8) * 0.28}rem`,
-}));
-
 const formatCards = cards => cards.map(card => `${card.value}${card.suit}`).join(' ');
 
 export default function App() {
@@ -123,15 +91,12 @@ export default function App() {
   const loggerRef = useRef(new GameLogger());
   const handleActionRef = useRef(null);
   const keyboardActionRef = useRef(null);
-  const voiceCommandRef = useRef(null);
   
   const [restored] = useState(loadSessionState);
-  const [profile, setProfile] = useState(loadProfile);
   const [history, setHistory] = useState(loadSessionHistory);
   const [viewedSession, setViewedSession] = useState(null);
   const strategyStatsRef = useRef({ decisions: 0, mistakes: 0 });
   const sessionStartedRef = useRef(null);
-  const profileDeltaRef = useRef({ decisions: null, hands: null, mistakes: null });
   const [rules, setRules] = useState(() => normalizeRules(restored?.rules));
   const [betSpread, setBetSpread] = useState(() => normalizeBetSpread(restored?.betSpread));
   const [bankroll, setBankroll] = useState(() => (
@@ -172,6 +137,10 @@ export default function App() {
   const [tablePace, setTablePace] = useState(() => (
     TABLE_PACES.includes(restored?.tablePace) ? restored.tablePace : 'manual'
   ));
+  const [dealMs, setDealMs] = useState(() => (
+    DEAL_SPEEDS_MS.includes(restored?.dealMs) ? restored.dealMs : DEFAULT_DEAL_MS
+  ));
+  const [cardInFlight, setCardInFlight] = useState(false);
   const [countDrillEnabled, setCountDrillEnabled] = useState(() => (
     typeof restored?.countDrillEnabled === 'boolean' ? restored.countDrillEnabled : true
   ));
@@ -188,9 +157,8 @@ export default function App() {
   const aiPlayersRef = useRef([]);
   const aiPreDoneRef = useRef(false);
   const aiPostDoneRef = useRef(false);
-  const tablePaceRef = useRef('manual');
-  const [celebrationKey, setCelebrationKey] = useState(0);
-  const [sickReactionKey, setSickReactionKey] = useState(0);
+  const dealMsRef = useRef(DEFAULT_DEAL_MS);
+  const cardInFlightRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hintedAction, setHintedAction] = useState(null);
   const [insuranceBets, setInsuranceBets] = useState([]);
@@ -210,31 +178,9 @@ export default function App() {
   ));
   const [pendingAction, setPendingAction] = useState(null);
 
-  const {
-    announce,
-    kokoroVoices,
-    lastAnnouncement,
-    lastHeard,
-    playSound,
-    selectedVoiceName,
-    setSoundEnabled,
-    setSpeechEnabled,
-    setSelectedVoiceName,
-    soundEnabled,
-    speechEnabled,
-    toggleVoiceInput,
-    voiceInputEnabled,
-    voiceError,
-    voiceModelProgress,
-    voiceModelStatus,
-    voiceStatus,
-    voiceSupported,
-  } = useTableVoice({
-    isListeningAllowed: !['dealerRevealing', 'shuffling', 'aiPlaying', 'dealing'].includes(gameState),
-    onCommand: command => voiceCommandRef.current?.(command),
-  });
+  const { playSound, setSoundEnabled, soundEnabled } = useTableSounds();
 
-  tablePaceRef.current = tablePace;
+  dealMsRef.current = dealMs;
   strategyStatsRef.current = { decisions: strategyDecisions, mistakes: strategyMistakes };
 
   const syncAiPlayers = (seats) => {
@@ -267,7 +213,7 @@ export default function App() {
   };
 
   const playAiSeats = async (position, dealerUpCard) => {
-    const delayMs = AI_ACTION_MS[tablePaceRef.current] ?? 1400;
+    const delayMs = dealMsRef.current;
     for (let index = 0; index < aiPlayersRef.current.length; index++) {
       if (aiPlayersRef.current[index].position !== position) continue;
       updateAiSeat(index, { status: 'acting' });
@@ -317,16 +263,6 @@ export default function App() {
     return () => document.removeEventListener('fullscreenchange', syncFullscreen);
   }, []);
 
-  const announcePlayerTurn = (spots, spotIndex, handIndex, lead = '') => {
-    const spot = spots[spotIndex];
-    const hand = spot?.subHands[handIndex];
-    if (!hand) return;
-    const calls = Array.isArray(lead) ? lead : lead ? [lead] : [];
-    if (calls.some(call => String(call).toLowerCase().includes('too many'))) {
-      announce('Too many.', { listenAfter: true });
-    }
-  };
-
   const addToBankroll = (amountOverride) => {
     const amount = Number(amountOverride ?? reloadAmount);
     if (!Number.isFinite(amount) || amount <= 0) return;
@@ -336,7 +272,6 @@ export default function App() {
     setReloadAmount(safeAmount);
     setShowReload(false);
     playSound('chips');
-    announce(`${safeAmount} dollars added. Bankroll is reloaded.`, { listenAfter: true });
     loggerRef.current.log('RELOAD', `Added $${safeAmount} to bankroll.`);
   };
 
@@ -354,7 +289,6 @@ export default function App() {
     const currentBet = spotBets[spotIndex] || 0;
     const nextBet = Math.min(TABLE_MAX_BET, currentBet + denomination);
     if (otherWagers + nextBet > bankroll) {
-      announce('Not enough chips in the rack for that wager.', { listenAfter: true });
       return;
     }
     playSound('chips');
@@ -471,11 +405,9 @@ export default function App() {
       : spotBets.slice(0, numHands);
     const totalWager = activeBets.reduce((sum, bet) => sum + bet, 0);
     if (activeBets.some(bet => !isValidTableWager(bet))) {
-      announce('Each spot needs a wager from 5 to 10000 dollars.', { listenAfter: true });
       return;
     }
     if (bankroll < totalWager) {
-      announce(`Insufficient funds. The wagers total ${totalWager} dollars and the bankroll is ${bankroll} dollars.`, { listenAfter: true });
       return;
     }
 
@@ -500,10 +432,6 @@ export default function App() {
           rule: `At true count ${sizingTrueCount >= 0 ? '+' : ''}${sizingTrueCount}, your bet spread calls for $${recommendedWager} on each active spot. Edit the spread in the Study Guide → Bet spread.`,
           type: 'betSizing',
         });
-        announce(
-          `Bet sizing warning. True count ${sizingTrueCount}. Recommended wager ${recommendedWager} dollars per spot.`,
-          { listenAfter: true },
-        );
         return;
       }
       setStrategyDecisions(current => current + 1);
@@ -519,12 +447,10 @@ export default function App() {
           trueCount: shoeRef.current.trueCount,
         });
         setGameState('countDrill');
-        announce('Shuffle check. What is your running count?');
         return;
       }
       setGameState('shuffling');
       loggerRef.current.log('SHUFFLE', 'Shoe penetration limit reached, reshuffling shoe.');
-      setProfile(current => recordShoe(current));
       await new Promise(r => setTimeout(r, 2000));
       shoeRef.current.buildAndShuffle();
     }
@@ -592,7 +518,7 @@ export default function App() {
     setPlayerSpots(spots);
     setGameState('dealing');
     const seatsInDeal = aiSeats.length + numHands + 1;
-    await new Promise(r => setTimeout(r, seatsInDeal * 2 * DEAL_STEP_MS + 260));
+    await new Promise(r => setTimeout(r, seatsInDeal * 2 * dealMs + 260));
 
     const d1Val = d1.value;
     const isDealerTenOrFace = d1.numericValue === 10;
@@ -607,14 +533,9 @@ export default function App() {
       if (evenMoneyOffers.length > 0) {
         setEvenMoneyQueue(evenMoneyOffers);
         setGameState('evenMoney');
-        announce(
-          `Dealer shows an ace. Spot ${evenMoneyOffers[0].spotIndex + 1} has blackjack. Even money decision pending.`,
-          { listenAfter: true },
-        );
         return;
       }
       setGameState('insurance');
-      announce('Dealer shows an ace. Insurance decision pending.', { listenAfter: true });
       return;
     }
 
@@ -679,7 +600,7 @@ export default function App() {
     }
   };
 
-  const findFirstActiveHand = (spots, sIdx, hIdx, runningReturn, totalWager, lead = '') => {
+  const findFirstActiveHand = (spots, sIdx, hIdx, runningReturn, totalWager) => {
     let found = false;
     for (let s = sIdx; s < spots.length; s++) {
       for (let h = (s === sIdx ? hIdx : 0); h < spots[s].subHands.length; h++) {
@@ -688,7 +609,6 @@ export default function App() {
           setActiveSubHandIndex(h);
           setGameState('playing');
           if (runningReturn > 0) setBankroll(b => b + runningReturn);
-          announcePlayerTurn(spots, s, h, lead);
           found = true;
           return;
         }
@@ -710,10 +630,6 @@ export default function App() {
     );
 
     if (remainingOffers.length > 0) {
-      announce(
-        `Spot ${remainingOffers[0].spotIndex + 1} has blackjack. Even money decision pending.`,
-        { listenAfter: true },
-      );
       return;
     }
 
@@ -722,7 +638,6 @@ export default function App() {
     ));
     if (hasInsuranceEligibleHand) {
       setGameState('insurance');
-      announce('Even money decisions complete. Insurance decision pending.', { listenAfter: true });
       return;
     }
 
@@ -733,7 +648,6 @@ export default function App() {
     const nextInsuranceBets = getInsuranceBets(spotsOverride, buy);
     const insTotalCost = nextInsuranceBets.reduce((sum, bet) => sum + bet, 0);
     if (buy && bankroll < insTotalCost) {
-      announce(`Insufficient funds for ${insTotalCost} dollars of insurance.`, { listenAfter: true });
       return;
     }
     if (buy) setBankroll(b => b - insTotalCost);
@@ -804,12 +718,6 @@ export default function App() {
         setActiveSpotIndex(next.spotIndex);
         setActiveSubHandIndex(next.handIndex);
         setGameState('playing');
-        announcePlayerTurn(
-          spots,
-          next.spotIndex,
-          next.handIndex,
-          'Dealer does not have blackjack.',
-        );
       } else {
         playDealerAndResolve(dealerHand, spots, nextInsuranceBets, winnings, totalWager);
       }
@@ -844,7 +752,7 @@ export default function App() {
     if (total > 21) {
       hand.status = 'bust';
       hand.outcome = 'loss';
-      advancePointer(spots, false, 'Too many.');
+      advancePointer(spots);
     } else if (total === 21 || hand.isSplitAce) {
       hand.status = 'stood';
       advancePointer(spots);
@@ -876,9 +784,6 @@ export default function App() {
     const spots = JSON.parse(JSON.stringify(playerSpots));
     const current = spots[activeSpotIndex]?.subHands[activeSubHandIndex];
     if (!canSurrenderHand(current)) {
-      announce('Late surrender is only available on the original two-card hand.', {
-        listenAfter: true,
-      });
       return;
     }
 
@@ -900,14 +805,13 @@ export default function App() {
         wager: current.bet,
       },
     );
-    advancePointer(spots, false, 'Hand surrendered. Half the wager returned.');
+    advancePointer(spots);
   };
 
   const executeDouble = (faceDown = false) => {
     let spots = JSON.parse(JSON.stringify(playerSpots));
     let hand = spots[activeSpotIndex].subHands[activeSubHandIndex];
     if (bankroll < hand.bet) {
-      announce(`Insufficient funds to double. The hand needs ${hand.bet} more dollars.`, { listenAfter: true });
       return;
     }
     
@@ -941,13 +845,7 @@ export default function App() {
         wager: hand.bet,
       },
     );
-    advancePointer(
-      spots,
-      false,
-      faceDown
-        ? ''
-        : total > 21 ? 'Too many.' : '',
-    );
+    advancePointer(spots);
   };
 
   const executeSplit = () => {
@@ -956,7 +854,6 @@ export default function App() {
     let hand = spot.subHands[activeSubHandIndex];
     if (spot.subHands.length >= 4 || !canSplitHand(hand)) return;
     if (bankroll < hand.bet) {
-      announce(`Insufficient funds to split. The hand needs ${hand.bet} more dollars.`, { listenAfter: true });
       return;
     }
 
@@ -982,14 +879,10 @@ export default function App() {
       },
     );
 
-    advancePointer(
-      spots,
-      true,
-      'Cards split.',
-    );
+    advancePointer(spots, true);
   };
 
-  const advancePointer = (spots, includeCurrent = false, lead = '') => {
+  const advancePointer = (spots, includeCurrent = false) => {
     setPlayerSpots(spots);
     const next = findNextPlayableHand(
       spots,
@@ -1002,7 +895,6 @@ export default function App() {
       setActiveSpotIndex(next.spotIndex);
       setActiveSubHandIndex(next.handIndex);
       setGameState('playing');
-      announcePlayerTurn(spots, next.spotIndex, next.handIndex, lead);
       return;
     }
 
@@ -1030,7 +922,7 @@ export default function App() {
 
     if (needsDealerDraw && !dealerHasBlackjack) {
       while (calculateTotal(dHand) < 17 || (rules.dealerHitsSoft17 && isSoft17(dHand))) {
-        await new Promise(r => setTimeout(r, 550));
+        await new Promise(r => setTimeout(r, dealMs));
         const drawnCard = shoeRef.current.draw();
         playSound('card');
         shoeRef.current.visibleRunningCount += drawnCard.countValue;
@@ -1061,9 +953,6 @@ export default function App() {
       setPlayerSpots(revealedSpots);
       playSound('card');
       await new Promise(r => setTimeout(r, 950));
-      if (faceDownDoubles.some(({ hand }) => calculateTotal(hand.cards) > 21)) {
-        await announce('Too many.');
-      }
     }
 
     resolveRound(dHand, revealedSpots, insBets, presetWinnings, totalWager);
@@ -1115,20 +1004,31 @@ export default function App() {
     setGameState('resolved');
     const outcomes = spots.flatMap(spot => spot.subHands.map(hand => hand.outcome));
     playSound(outcomes.includes('win') ? 'win' : outcomes.every(outcome => outcome === 'loss') ? 'loss' : 'chips');
-    if (dTotal > 21) announce('Too many.', { listenAfter: true });
+  };
+
+  // Hits, doubles and splits wait one deal interval for the card to arrive,
+  // with actions locked so a second press can't draw again.
+  const afterCardDelay = async (execute) => {
+    cardInFlightRef.current = true;
+    setCardInFlight(true);
+    await new Promise(r => setTimeout(r, dealMs));
+    cardInFlightRef.current = false;
+    setCardInFlight(false);
+    execute();
   };
 
   const executeRequestedAction = (actionType) => {
-    if (actionType === 'hit') return executeHit();
+    if (actionType === 'hit') return afterCardDelay(executeHit);
     if (actionType === 'stand') return executeStand();
-    if (actionType === 'double') return executeDouble(false);
-    if (actionType === 'doubleFaceDown') return executeDouble(true);
-    if (actionType === 'split') return executeSplit();
+    if (actionType === 'double') return afterCardDelay(() => executeDouble(false));
+    if (actionType === 'doubleFaceDown') return afterCardDelay(() => executeDouble(true));
+    if (actionType === 'split') return afterCardDelay(executeSplit);
     if (actionType === 'surrender') return executeSurrender();
     return undefined;
   };
 
   const handleAction = (actionType) => {
+    if (cardInFlightRef.current) return;
     setHintedAction(null);
     const curHand = getCurrentActiveHand();
     if (!curHand || !dealerHand[0]) return executeRequestedAction(actionType);
@@ -1165,7 +1065,6 @@ export default function App() {
           revealHint: false,
           rule: evaluation.rule,
         });
-        announce('Are you sure?', { listenAfter: true });
       }
     } else {
       setStrategyDecisions(current => current + 1);
@@ -1185,7 +1084,6 @@ export default function App() {
         setSpotBets(current => current.map((bet, index) => (
           index < numHands ? action.recommendedWager : bet
         )));
-        announce(`Wagers corrected to ${action.recommendedWager} dollars per spot.`, { listenAfter: true });
       }
       return;
     }
@@ -1210,7 +1108,6 @@ export default function App() {
 
     const hand = getCurrentActiveHand();
     if (gameState !== 'playing' || !hand || !dealerHand[0]) {
-      announce('Strategy advice is available during an active player hand.', { listenAfter: true });
       return;
     }
     const evaluation = getDetailedPlay(
@@ -1230,95 +1127,11 @@ export default function App() {
     setHintedAction(recommendedAction);
     setStrategyDecisions(current => current + 1);
     setStrategyMistakes(current => current + 1);
-    announce(
-      `${evaluation.type} recommends ${recommendedAction}. The recommended button is highlighted. ${evaluation.rule}`,
-      { listenAfter: true },
-    );
   };
 
   const canSplitCurrent = () => {
     const currentSpot = playerSpots[activeSpotIndex];
     return currentSpot?.subHands.length < 4 && canSplitHand(getCurrentActiveHand());
-  };
-
-  const getRoundOutcomeSummary = (spotsForSummary = playerSpots) => (
-    spotsForSummary.flatMap((spot, spotIndex) => (
-      spot.subHands.map((hand, handIndex) => {
-        const handName = spot.subHands.length > 1
-          ? `spot ${spotIndex + 1}, split hand ${handIndex + 1}`
-          : `spot ${spotIndex + 1}`;
-        return `${handName} ${hand.outcome || 'is unresolved'}`;
-      })
-    )).join('. ')
-  );
-
-  const getVoiceSummary = () => {
-    if (pendingAction) {
-      return pendingAction.revealHint
-        ? `The recommended choice is ${pendingAction.optimal}.`
-        : 'Are you sure? Strategy decision pending.';
-    }
-
-    if (gameState === 'betting') {
-      const wagers = spotBets
-        .slice(0, numHands)
-        .map((bet, index) => `spot ${index + 1}, ${bet} dollars`)
-        .join('; ');
-      return `${numHands} ${numHands === 1 ? 'spot' : 'spots'}: ${wagers}.`;
-    }
-
-    if (gameState === 'evenMoney') {
-      const offer = evenMoneyQueue[0];
-      return `Spot ${offer?.spotIndex + 1} has blackjack. Even money decision pending.`;
-    }
-
-    if (gameState === 'insurance') {
-      return 'Dealer shows an ace. Insurance decision pending.';
-    }
-
-    if (gameState === 'playing') {
-      const hand = getCurrentActiveHand();
-      return `Active spot ${activeSpotIndex + 1}${playerSpots[activeSpotIndex]?.subHands.length > 1 ? `, split hand ${activeSubHandIndex + 1}` : ''}, total ${getSpokenHandTotal(hand?.cards)}.`;
-    }
-
-    if (gameState === 'resolved') {
-      const queuedWagers = spotBets
-        .slice(0, numHands)
-        .map((bet, index) => `spot ${index + 1}, ${bet} dollars`)
-        .join('; ');
-      return `${getRoundOutcomeSummary()}. Bankroll ${bankroll} dollars. Next wager: ${queuedWagers}.`;
-    }
-
-    return gameState === 'shuffling'
-      ? 'The shoe is shuffling. Please wait.'
-      : 'The dealer is completing the round. Please wait.';
-  };
-
-  const configureVoiceBets = (command) => {
-    const spotCount = command.spotCount || (command.bets.length > 1 ? command.bets.length : numHands);
-    if (![1, 2].includes(spotCount)) {
-      announce('This table supports one or two player spots.', { listenAfter: true });
-      return;
-    }
-
-    const bets = command.bets.length === 1 && spotCount === 2
-      ? [command.bets[0], command.bets[0]]
-      : command.bets;
-    if (
-      bets.length !== spotCount
-      || bets.some(bet => !isValidTableWager(bet))
-    ) {
-      announce(
-        `Please give one wager for each spot, between 25 and 10000 dollars in 25 dollar units.`,
-        { listenAfter: true },
-      );
-      return;
-    }
-
-    updateSpotCount(spotCount);
-    setSpotBets(current => current.map((bet, index) => bets[index] ?? bet));
-    const summary = bets.map((bet, index) => `spot ${index + 1}, ${bet} dollars`).join('; ');
-    announce(`${spotCount} ${spotCount === 1 ? 'spot' : 'spots'} set. ${summary}.`, { listenAfter: true });
   };
 
   const beginNextRound = () => {
@@ -1347,38 +1160,9 @@ export default function App() {
         `Shuffle count check: called ${guess}, actual ${drill.actual} (off by ${difference}).`,
         { difference, guess, runningCount: drill.actual, trueCount: drill.trueCount },
       );
-      setProfile(current => recordDrill(current, difference));
     }
     deal(drill.bets, { skipBetWarning: true, skipCountDrill: true });
   };
-
-  // Lifetime profile: fold session deltas in as they happen.
-  useEffect(() => {
-    const previous = profileDeltaRef.current;
-    if (previous.decisions === null) {
-      profileDeltaRef.current = { decisions: strategyDecisions, hands: sessionHands.length, mistakes: strategyMistakes };
-      return;
-    }
-    const decisionDelta = strategyDecisions - previous.decisions;
-    const mistakeDelta = strategyMistakes - previous.mistakes;
-    const newHands = sessionHands.slice(previous.hands);
-    profileDeltaRef.current = { decisions: strategyDecisions, hands: sessionHands.length, mistakes: strategyMistakes };
-    if (decisionDelta > 0 || newHands.length > 0) {
-      setProfile((current) => {
-        let next = current;
-        if (decisionDelta > 0) next = recordDecisions(next, { decisions: decisionDelta, mistakes: Math.max(0, mistakeDelta) });
-        if (newHands.length > 0) {
-          next = recordHands(next, newHands);
-          if (aiSeatCount === 4 && tablePace === 'pro') next = recordFullTableCasinoRound(next);
-        }
-        return next;
-      });
-    }
-  }, [strategyDecisions, strategyMistakes, sessionHands, aiSeatCount, tablePace]);
-
-  useEffect(() => {
-    saveProfile(profile);
-  }, [profile]);
 
   useEffect(() => {
     saveSessionHistory(history);
@@ -1407,7 +1191,6 @@ export default function App() {
       setHistory(current => [...current, record].slice(-40));
     }
     sessionStartedRef.current = Date.now();
-    setProfile(current => startNewSession(recordSessionPnl(current, sessionPnl)));
     setBankroll(STARTING_BANKROLL);
     setTotalBuyIns(0);
     setSessionHands([]);
@@ -1421,7 +1204,6 @@ export default function App() {
     loggerRef.current = new GameLogger();
     setGameState('betting');
     setShowSettings(false);
-    announce('New session. Bankroll reset to one thousand dollars, fresh shoe.', { listenAfter: true });
   };
 
   // Pre-compute the rules' advantage curve in idle time so the bet-spread lab
@@ -1458,6 +1240,7 @@ export default function App() {
       strategyDecisions,
       strategyMistakes,
       tablePace,
+      dealMs,
       sessionStartedAt: sessionStartedRef.current,
       showActionEvs,
       totalBuyIns,
@@ -1467,18 +1250,8 @@ export default function App() {
   }, [
     aiSeatCount, bankroll, betSpread, countDrillEnabled, countDrillStats, numHands, playerSpots,
     reloadAmount, rules, sessionHands, showActionEvs, showStrategyPopups, spotBets,
-    strategyDecisions, strategyMistakes, tablePace, totalBuyIns, warnBetSizing, warnStrategy,
+    strategyDecisions, strategyMistakes, tablePace, dealMs, totalBuyIns, warnBetSizing, warnStrategy,
   ]);
-
-  const triggerCelebration = () => {
-    setCelebrationKey(current => current + 1);
-    playSound('win');
-  };
-
-  const triggerSickReaction = () => {
-    setSickReactionKey(current => current + 1);
-    playSound('loss');
-  };
 
   const toggleFullscreen = async (enabled = !isFullscreen) => {
     try {
@@ -1488,222 +1261,7 @@ export default function App() {
         await document.exitFullscreen();
       }
     } catch {
-      announce('Fullscreen was blocked by the browser.', {
-        listenAfter: true,
-      });
-    }
-  };
-
-  const stackBets = (dealImmediately = false) => {
-    if (!['betting', 'resolved'].includes(gameState)) {
-      announce('Stack it is available between rounds.', { listenAfter: true });
-      return;
-    }
-
-    const activeBets = spotBets.slice(0, numHands);
-    if (activeBets.some(bet => bet * 2 > 10000)) {
-      announce('The table maximum is 10000 dollars per spot.', { listenAfter: true });
-      return;
-    }
-
-    const doubledBets = activeBets.map(bet => bet * 2);
-    setSpotBets(current => current.map((bet, index) => doubledBets[index] ?? bet));
-    const summary = doubledBets
-      .map((bet, index) => `spot ${index + 1}, ${bet} dollars`)
-      .join('; ');
-    if (dealImmediately) {
-      deal(doubledBets);
-    } else {
-      announce(`Wagers doubled. ${summary}.`, { listenAfter: true });
-    }
-  };
-
-  const handleVoiceCommand = (command) => {
-    if (command?.type === 'unknown' || !command) {
-      announce(`I did not recognize that command. ${getVoiceSummary()}`, { listenAfter: true });
-      return;
-    }
-
-    if (command.type === 'help') {
-      announce(
-        'You can set one or two spots with separate wagers, deal, hit, stand, double, split, surrender, buy or decline insurance, take or decline even money, say run it, next, stack it, bang, toggle the count, dealer voice, or study guide, reload funds, or ask for a strategy tip, bankroll, or status.',
-        { listenAfter: true },
-      );
-      return;
-    }
-    if (command.type === 'status') {
-      announce(getVoiceSummary(), { listenAfter: true });
-      return;
-    }
-    if (command.type === 'micTest') {
-      announce(
-        `Microphone check passed. I heard ${lastHeard || 'your voice'} clearly.`,
-        { listenAfter: true },
-      );
-      return;
-    }
-    if (command.type === 'bankroll') {
-      announce(`Bankroll is ${bankroll} dollars.`, { listenAfter: true });
-      return;
-    }
-    if (command.type === 'tip') {
-      requestHint();
-      return;
-    }
-    if (command.type === 'count') {
-      setShowCount(command.enabled);
-      if (command.enabled) {
-        announce(
-          getSpokenCountSummary(
-            shoeRef.current.visibleRunningCount,
-            shoeRef.current.trueCount,
-            shoeRef.current.decksRemaining,
-          ),
-          { listenAfter: true },
-        );
-      } else {
-        announce('Count display off.', { listenAfter: true });
-      }
-      return;
-    }
-    if (command.type === 'sound') {
-      setSoundEnabled(command.enabled);
-      announce(`Sound effects ${command.enabled ? 'on' : 'off'}.`, { listenAfter: true });
-      return;
-    }
-    if (command.type === 'speech') {
-      announce(`Dealer voice ${command.enabled ? 'on' : 'off'}.`, { listenAfter: true });
-      setSpeechEnabled(command.enabled);
-      return;
-    }
-    if (command.type === 'guard') {
-      setWarnStrategy(command.enabled);
-      announce(`Strategy guard ${command.enabled ? 'on' : 'off'}.`, { listenAfter: true });
-      return;
-    }
-    if (command.type === 'popups') {
-      setShowStrategyPopups(command.enabled);
-      announce(`Strategy popups ${command.enabled ? 'on' : 'off'}.`, { listenAfter: true });
-      return;
-    }
-    if (command.type === 'studyGuide') {
-      setShowCheatSheet(command.open);
-      announce(`Study guide ${command.open ? 'opened' : 'closed'}.`, { listenAfter: true });
-      return;
-    }
-    if (command.type === 'export') {
-      loggerRef.current.downloadCSV();
-      announce('Game log exported.', { listenAfter: true });
-      return;
-    }
-    if (command.type === 'reload') {
-      addToBankroll(command.amount);
-      return;
-    }
-    if (command.type === 'celebrate') {
-      triggerCelebration();
-      return;
-    }
-    if (command.type === 'sickReaction') {
-      triggerSickReaction();
-      return;
-    }
-    if (command.type === 'countToggle') {
-      setShowCount(current => !current);
-      return;
-    } else if (command.type === 'fullscreen') {
-      toggleFullscreen(command.enabled);
-      return;
-    }
-    if (command.type === 'stackBet') {
-      stackBets();
-      return;
-    }
-    if (command.type === 'stackAndRun') {
-      stackBets(true);
-      return;
-    }
-    if (command.type === 'runIt') {
-      if (['betting', 'resolved'].includes(gameState)) deal();
-      else announce('Run it is available between rounds.', { listenAfter: true });
-      return;
-    }
-
-    if (gameState === 'resolved' && command.type === 'configureBets') {
-      configureVoiceBets(command);
-      return;
-    }
-
-    if (pendingAction) {
-      if (command.type === 'proceed') resolvePendingAction(true);
-      else if (command.type === 'correct') resolvePendingAction(false);
-      else if (command.type === 'cancel') dismissPendingAction();
-      else announce(getVoiceSummary(), { listenAfter: true });
-      return;
-    }
-
-    if (gameState === 'betting') {
-      if (command.type === 'configureBets') configureVoiceBets(command);
-      else if (command.type === 'setSpots') {
-        updateSpotCount(command.spotCount);
-        announce(
-          `${command.spotCount} ${command.spotCount === 1 ? 'spot' : 'spots'} selected.`,
-          { listenAfter: true },
-        );
-      } else if (command.type === 'deal') deal();
-      else announce(getVoiceSummary(), { listenAfter: true });
-      return;
-    }
-
-    if (gameState === 'playing') {
-      if (command.type !== 'action') {
-        announce(getVoiceSummary(), { listenAfter: true });
-        return;
-      }
-      if (
-        ['double', 'doubleFaceDown'].includes(command.action)
-        && getCurrentActiveHand()?.cards.length !== 2
-      ) {
-        announce('Double is not available after a hit.', { listenAfter: true });
-      } else if (command.action === 'split' && !canSplitCurrent()) {
-        announce('Split is not available for this hand.', { listenAfter: true });
-      } else if (command.action === 'surrender' && !canSurrenderHand(getCurrentActiveHand())) {
-        announce('Late surrender is only available on the original two-card hand.', {
-          listenAfter: true,
-        });
-      } else {
-        handleAction(command.action);
-      }
-      return;
-    }
-
-    if (gameState === 'insurance' && command.type === 'insurance') {
-      executeInsurance(command.buy);
-      return;
-    }
-    if (gameState === 'evenMoney' && command.type === 'evenMoney') {
-      executeEvenMoney(command.accept);
-      return;
-    }
-    if (gameState === 'resolved' && command.type === 'nextRound') {
-      beginNextRound();
-      return;
-    }
-
-    announce(getVoiceSummary(), { listenAfter: true });
-  };
-
-  voiceCommandRef.current = handleVoiceCommand;
-
-  const handleVoiceToggle = async () => {
-    const enabling = !voiceInputEnabled;
-    const enabled = await toggleVoiceInput();
-    if (enabling && enabled) {
-      playSound('chips');
-      announce(
-        `Voice mode on. ${getVoiceSummary()}`,
-        { listenAfter: true },
-      );
+      // The browser blocked fullscreen; the page stays as it was.
     }
   };
 
@@ -1728,8 +1286,6 @@ export default function App() {
       setShowCount(current => !current);
     } else if (command.type === 'fullscreen') {
       toggleFullscreen();
-    } else if (command.type === 'voiceMode') {
-      handleVoiceToggle();
     } else if (command.type === 'action') {
       if (command.action === 'double' && getCurrentActiveHand()?.cards.length !== 2) return;
       if (command.action === 'split' && !canSplitCurrent()) return;
@@ -1787,7 +1343,7 @@ export default function App() {
             >${c >= 1000 ? `${c / 1000}K` : c}</div>
           ))}
         </div>
-        <div style={{ fontSize: small ? '0.62rem' : '0.8rem', fontWeight: '600', color: 'var(--brass-light)' }}>${amount}</div>
+        <div style={{ fontSize: small ? '0.62rem' : '0.8rem', fontWeight: '600', color: '#f1c40f' }}>${amount}</div>
       </div>
     );
   };
@@ -1802,7 +1358,7 @@ export default function App() {
   const getDealDelay = (seatKey, cardIndex) => {
     if (cardIndex > 1) return 0;
     const seatIndex = Math.max(0, dealOrder.indexOf(seatKey));
-    return (cardIndex * dealOrder.length + seatIndex) * DEAL_STEP_MS;
+    return (cardIndex * dealOrder.length + seatIndex) * dealMs;
   };
 
   const renderAiSeat = (seat) => {
@@ -1868,10 +1424,6 @@ export default function App() {
     unresolvedWager: unresolvedHandWager + unresolvedInsuranceWager,
   });
 
-  useEffect(() => {
-    if (sessionPnl > 0) setProfile(current => recordSessionPnl(current, sessionPnl));
-  }, [sessionPnl]);
-
   return (
     <main className="app-shell" style={{
       position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
@@ -1904,67 +1456,7 @@ export default function App() {
           from { margin-top: -18px; opacity: 0; filter: brightness(1.35); }
           to { margin-top: 0; opacity: 1; filter: brightness(1); }
         }
-        @keyframes confettiFall {
-          0% { opacity: 0; transform: translate3d(0, -16vh, 0) rotate(0deg) scale(0.55); }
-          7% { opacity: 1; }
-          72% { opacity: 1; }
-          100% { opacity: 0; transform: translate3d(var(--confetti-drift), 112vh, 0) rotate(var(--confetti-rotation)) scale(var(--particle-scale)); }
-        }
-        @keyframes sickReactionFall {
-          0% { opacity: 0; transform: translate3d(0, -18vh, 0) rotate(-20deg) scale(0.45); }
-          8% { opacity: 1; }
-          58% { opacity: 1; transform: translate3d(var(--sick-drift), 58vh, 0) rotate(16deg) scale(1.18); }
-          84% { opacity: 1; }
-          100% { opacity: 0; transform: translate3d(var(--sick-drift), 116vh, 0) rotate(-14deg) scale(0.88); }
-        }
-        @keyframes sickScreenPulse {
-          0%, 100% { opacity: 0; }
-          18% { opacity: 0.68; }
-          45% { opacity: 0.2; }
-          67% { opacity: 0.52; }
-        }
-        @keyframes sickGiantPulse {
-          0%, 100% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(0.45); }
-          24% { opacity: 0.96; transform: translate(-50%, -50%) rotate(7deg) scale(1.08); }
-          62% { opacity: 0.72; transform: translate(-50%, -50%) rotate(-4deg) scale(0.92); }
-        }
       `}</style>
-
-      {celebrationKey > 0 && (
-        <div key={celebrationKey} className="confetti-burst" aria-hidden="true">
-          {CONFETTI_PARTICLES.map((particle, index) => (
-            <i
-              key={index}
-              style={{
-                '--confetti-drift': particle.drift,
-                '--confetti-rotation': particle.rotation,
-                '--particle-scale': particle.scale,
-                animationDelay: particle.delay,
-                backgroundColor: particle.color,
-                left: particle.left,
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {sickReactionKey > 0 && (
-        <div key={sickReactionKey} className="sick-reaction" aria-hidden="true">
-          {SICK_REACTION_PARTICLES.map((particle, index) => (
-            <i
-              key={index}
-              style={{
-                '--sick-drift': particle.drift,
-                animationDelay: particle.delay,
-                fontSize: particle.size,
-                left: particle.left,
-              }}
-            >
-              {particle.emoji}
-            </i>
-          ))}
-        </div>
-      )}
 
       {showCheatSheet && (
         <CheatSheet
@@ -1990,17 +1482,12 @@ export default function App() {
           onStrategyPopupsChange={setShowStrategyPopups}
           soundEnabled={soundEnabled}
           onSoundChange={setSoundEnabled}
-          speechEnabled={speechEnabled}
-          onSpeechChange={setSpeechEnabled}
-          kokoroVoices={kokoroVoices}
-          selectedVoiceName={selectedVoiceName}
-          onVoiceChange={setSelectedVoiceName}
-          voiceModelStatus={voiceModelStatus}
-          voiceModelProgress={voiceModelProgress}
-          onPreviewVoice={() => announce('Betting is open.')}
           onExportLog={() => loggerRef.current.downloadCSV()}
           tablePace={tablePace}
           onTablePaceChange={setTablePace}
+          dealMs={dealMs}
+          dealSpeeds={DEAL_SPEEDS_MS}
+          onDealMsChange={setDealMs}
           countDrillEnabled={countDrillEnabled}
           onCountDrillChange={setCountDrillEnabled}
           drillStats={countDrillStats}
@@ -2009,7 +1496,6 @@ export default function App() {
           rules={rules}
           onRulesChange={changes => setRules(current => normalizeRules({ ...current, ...changes }))}
           rulesLocked={!['betting', 'resolved'].includes(gameState)}
-          profile={profile}
           sessionStatus={{
             accuracyRate,
             bankroll,
@@ -2046,7 +1532,6 @@ export default function App() {
         onProceed={() => resolvePendingAction(true)}
       />
 
-      <div className="sr-only" aria-live="assertive" aria-atomic="true">{lastAnnouncement}</div>
 
       {/* HEADER BAR */}
       <div className="header-bar">
@@ -2086,24 +1571,6 @@ export default function App() {
             Study guide
           </button>
           <button
-            className={`topbar-button header-icon-button voice-toggle ${voiceInputEnabled ? 'is-on' : ''} ${['starting', 'listening', 'hearing', 'processing'].includes(voiceStatus) ? 'is-listening' : ''}`}
-            onClick={handleVoiceToggle}
-            disabled={!voiceSupported}
-            aria-pressed={voiceInputEnabled}
-            aria-label={voiceInputEnabled ? 'Turn voice commands off' : 'Turn voice commands on'}
-            title={voiceSupported
-              ? voiceInputEnabled ? 'Voice commands on' : 'Voice commands'
-              : 'Voice commands unavailable'}
-          >
-            <svg className="header-action-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Z" />
-              <path d="M6.2 11.2a5.8 5.8 0 0 0 11.6 0M12 17.4V21m-3.2 0h6.4" />
-            </svg>
-            <span className="sr-only">
-              {voiceInputEnabled ? 'Voice commands on' : 'Voice commands off'}
-            </span>
-          </button>
-          <button
             className="topbar-button header-icon-button"
             onClick={() => setShowSettings(true)}
             aria-haspopup="dialog"
@@ -2118,29 +1585,6 @@ export default function App() {
           </button>
         </div>
       </div>
-
-      {voiceInputEnabled && (
-        <div className="floating-voice-mode">
-          <div className={`voice-diagnostic is-${voiceStatus}`} role="status" aria-live="polite">
-            <span className="voice-level" aria-hidden="true"><i /><i /><i /></span>
-            <strong>
-              {voiceStatus === 'hearing'
-                ? 'Speech detected'
-                : voiceStatus === 'processing'
-                  ? 'Matching command'
-                  : voiceStatus === 'blocked'
-                    ? 'Microphone blocked'
-                    : voiceStatus === 'error'
-                      ? 'Microphone needs attention'
-                      : 'Microphone listening'}
-            </strong>
-            <span>
-              {voiceError
-                || (lastHeard ? `Latest transcript: “${lastHeard}”` : 'Say “microphone test” to verify the full recognition path.')}
-            </span>
-          </div>
-        </div>
-      )}
 
       {showReload && (
         <div className="popover-scrim" onClick={() => setShowReload(false)} aria-hidden="true" />
@@ -2387,6 +1831,7 @@ export default function App() {
       ) : (
         <GameControls
           gameState={gameState}
+          cardInFlight={cardInFlight}
           spotBets={spotBets}
           setSpotBet={updateSpotBet}
           numHands={numHands}

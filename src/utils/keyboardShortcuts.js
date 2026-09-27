@@ -11,7 +11,6 @@ export const getKeyboardCommand = (key, gameState) => {
 
   if (normalizedKey === 'c') return { type: 'countToggle' };
   if (normalizedKey === 'f') return { type: 'fullscreen' };
-  if (normalizedKey === 'v') return { type: 'voiceMode' };
   if (gameState === 'playing' && PLAYING_SHORTCUTS[normalizedKey]) {
     return { type: 'action', action: PLAYING_SHORTCUTS[normalizedKey] };
   }

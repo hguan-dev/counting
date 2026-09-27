@@ -14,8 +14,9 @@ Play the current build at [hguan-dev.github.io/counting](https://hguan-dev.githu
 - Self-hosted SVG card faces, overlapping casino-style layouts, chip stacks, sounds,
   reshuffle animation, fullscreen mode, and responsive mobile sizing.
 - Practice bankroll reloads and wagers from $25 to $10,000 in $25 increments.
-- Same-bet next round, doubled-bet shortcuts, detailed CSV session logs, and celebratory
-  or reaction animations.
+- Same-bet next round and detailed CSV session logs.
+- Cards are dealt at 0.8 seconds each by default, for the player, the dealer, and every
+  companion seat, so there is time to count. Deal speed is adjustable in Settings.
 
 ## Training and analytics
 
@@ -29,34 +30,16 @@ Play the current build at [hguan-dev.github.io/counting](https://hguan-dev.githu
 - Live realized session P&L reconciled to stack minus starting bankroll and reloads,
   with unresolved wagers excluded, plus strategy accuracy from graded decisions.
 - A per-settled-hand cumulative P&L chart with true count on a labeled independent axis.
+- A strategy quiz that deals only close calls and count deviations, the spots where
+  the best play beats the next best by less than 0.08 units.
 
 Asking for a hint or triggering a strategy warning counts as one mistake. A warned
 decision is never double-counted if the player then reveals the hint or plays anyway.
 
-## Voice mode and accessibility
-
-Voice mode is off by default and asks for browser microphone permission when enabled.
-It supports the same essential operations as the controls: configure one or two spots
-and their wagers, deal, hit, stand, double, split, surrender, insurance, even money,
-reload, move between rounds, toggle Count/Guide/dealer voice/sound/fullscreen, export,
-request a hint, or ask for the count, bankroll, and status. Player speech interrupts
-dealer speech.
-
-Useful conversational aliases include:
-
-- `run it`, `running it`, `Reddit`, `again`, `start`, or `go`: immediately deal the
-  next round at the same wagers.
-- `next`: return to wager selection; `stack it up`: double the previous wager and deal.
-- `up it to 50` or `bet 50`: change the queued next-round wager without dealing.
-- `good`, `I'm good`, `stay`, or `Stan`: stand.
-- `face up` or `face down`: choose the corresponding double treatment.
-- `sorry` or `my bad`: dismiss a strategy warning and use the recommendation.
-- `go back`: close the warning without revealing or highlighting the recommendation.
-- `nah`: keep the warned choice and play anyway.
-- `hint`: highlight and explain the count-adjusted optimal action.
+## Keyboard shortcuts
 
 Keyboard shortcuts are `H` hit, `S` stand, `D` double, `P` split, `R` surrender,
-`I` insurance/even money, `C` count, `V` voice mode, and `F` fullscreen.
+`I` insurance/even money, `C` count, and `F` fullscreen.
 
 ## Development
 
@@ -75,8 +58,8 @@ npm run build
 
 The test suite covers hand totals, H17 basic strategy, Hi-Lo deviation thresholds,
 bet sizing, shoe behavior, split/resplit eligibility, surrender, split-ace behavior,
-post-split turn order, natural blackjack, keyboard shortcuts, card assets, dealer
-speech, Kokoro voice setup, and speech-recognition command routing.
+post-split turn order, natural blackjack, keyboard shortcuts, card assets, quiz spot
+selection, and the bet spread optimizer.
 
 ## Card artwork
 
@@ -84,13 +67,6 @@ Card faces are bundled from [Webisso Playing Cards](https://github.com/Webisso/p
 an MIT-licensed set of SVG playing-card assets. The original license is included at
 `public/cards/LICENSE.txt`. Assets are self-hosted so play does not depend on a third-party
 image server, and the UI still includes a built-in text-card fallback.
-
-## Voice model
-
-Dealer speech is off by default. When enabled, it uses Kokoro in the browser with the
-Heart voice selected by default.
-Common table phrases are warmed during initialization to reduce first-use latency.
-Model files are cached by the browser after their first successful load.
 
 ## Deployment
 
