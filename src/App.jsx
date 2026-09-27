@@ -141,6 +141,8 @@ export default function App() {
     DEAL_SPEEDS_MS.includes(restored?.dealMs) ? restored.dealMs : DEFAULT_DEAL_MS
   ));
   const [cardInFlight, setCardInFlight] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const noticeTimerRef = useRef(null);
   const [countDrillEnabled, setCountDrillEnabled] = useState(() => (
     typeof restored?.countDrillEnabled === 'boolean' ? restored.countDrillEnabled : true
   ));
@@ -263,6 +265,15 @@ export default function App() {
     return () => document.removeEventListener('fullscreenchange', syncFullscreen);
   }, []);
 
+  // Brief on-screen message for an action the table can't take.
+  const showNotice = (text) => {
+    window.clearTimeout(noticeTimerRef.current);
+    setNotice({ key: Date.now(), text });
+    noticeTimerRef.current = window.setTimeout(() => setNotice(null), 3600);
+  };
+
+  useEffect(() => () => window.clearTimeout(noticeTimerRef.current), []);
+
   const addToBankroll = (amountOverride) => {
     const amount = Number(amountOverride ?? reloadAmount);
     if (!Number.isFinite(amount) || amount <= 0) return;
@@ -289,6 +300,7 @@ export default function App() {
     const currentBet = spotBets[spotIndex] || 0;
     const nextBet = Math.min(TABLE_MAX_BET, currentBet + denomination);
     if (otherWagers + nextBet > bankroll) {
+      showNotice(`Not enough in your bankroll for a $${nextBet.toLocaleString()} wager.`);
       return;
     }
     playSound('chips');
@@ -405,9 +417,11 @@ export default function App() {
       : spotBets.slice(0, numHands);
     const totalWager = activeBets.reduce((sum, bet) => sum + bet, 0);
     if (activeBets.some(bet => !isValidTableWager(bet))) {
+      showNotice('Each spot needs a wager from $5 to $10,000.');
       return;
     }
     if (bankroll < totalWager) {
+      showNotice(`Not enough to deal: the wagers total $${totalWager.toLocaleString()} and your bankroll is $${bankroll.toLocaleString()}.`);
       return;
     }
 
@@ -648,6 +662,7 @@ export default function App() {
     const nextInsuranceBets = getInsuranceBets(spotsOverride, buy);
     const insTotalCost = nextInsuranceBets.reduce((sum, bet) => sum + bet, 0);
     if (buy && bankroll < insTotalCost) {
+      showNotice(`Not enough for $${insTotalCost.toLocaleString()} of insurance.`);
       return;
     }
     if (buy) setBankroll(b => b - insTotalCost);
@@ -784,6 +799,7 @@ export default function App() {
     const spots = JSON.parse(JSON.stringify(playerSpots));
     const current = spots[activeSpotIndex]?.subHands[activeSubHandIndex];
     if (!canSurrenderHand(current)) {
+      showNotice('Surrender is only allowed on your first two cards.');
       return;
     }
 
@@ -1018,6 +1034,12 @@ export default function App() {
   };
 
   const executeRequestedAction = (actionType) => {
+    const needsMatchingBet = ['double', 'doubleFaceDown', 'split'].includes(actionType);
+    const handBet = getCurrentActiveHand()?.bet || 0;
+    if (needsMatchingBet && bankroll < handBet) {
+      showNotice(`Not enough to ${actionType === 'split' ? 'split' : 'double'}: you need $${handBet.toLocaleString()} more.`);
+      return undefined;
+    }
     if (actionType === 'hit') return afterCardDelay(executeHit);
     if (actionType === 'stand') return executeStand();
     if (actionType === 'double') return afterCardDelay(() => executeDouble(false));
@@ -1261,7 +1283,7 @@ export default function App() {
         await document.exitFullscreen();
       }
     } catch {
-      // The browser blocked fullscreen; the page stays as it was.
+      showNotice('Your browser blocked fullscreen.');
     }
   };
 
@@ -1816,6 +1838,12 @@ export default function App() {
           </>
         )}
       </div>
+
+      {notice && (
+        <div key={notice.key} className="table-notice" role="status" aria-live="polite">
+          {notice.text}
+        </div>
+      )}
 
       {/* EVEN MONEY CONTROL OVERLAY OR CONTROLS */}
       {evenMoneyQueue.length > 0 ? (
