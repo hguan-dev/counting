@@ -161,6 +161,9 @@ export default function App() {
   const aiPostDoneRef = useRef(false);
   const dealMsRef = useRef(DEFAULT_DEAL_MS);
   const cardInFlightRef = useRef(false);
+  // Set once the current play decision is counted, so a hint, a warning,
+  // "Go back" and the final play add up to one decision and at most one mistake.
+  const decisionGradedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hintedAction, setHintedAction] = useState(null);
   const [insuranceBets, setInsuranceBets] = useState([]);
@@ -473,6 +476,8 @@ export default function App() {
     playSound('deal');
     setInsuranceBets(new Array(numHands).fill(0));
     setEvenMoneyQueue([]);
+    setHintedAction(null);
+    decisionGradedRef.current = false;
     aiPreDoneRef.current = false;
     aiPostDoneRef.current = false;
 
@@ -1040,6 +1045,7 @@ export default function App() {
       showNotice(`Not enough to ${actionType === 'split' ? 'split' : 'double'}: you need $${handBet.toLocaleString()} more.`);
       return undefined;
     }
+    decisionGradedRef.current = false;
     if (actionType === 'hit') return afterCardDelay(executeHit);
     if (actionType === 'stand') return executeStand();
     if (actionType === 'double') return afterCardDelay(() => executeDouble(false));
@@ -1050,7 +1056,8 @@ export default function App() {
   };
 
   const handleAction = (actionType) => {
-    if (cardInFlightRef.current) return;
+    // The strategy check doesn't block shortcut keys, so ignore plays while it is open.
+    if (cardInFlightRef.current || pendingAction) return;
     setHintedAction(null);
     const curHand = getCurrentActiveHand();
     if (!curHand || !dealerHand[0]) return executeRequestedAction(actionType);
@@ -1070,26 +1077,23 @@ export default function App() {
     let optimal = evaluation.action;
     if (optimal === 'double' && curHand.cards.length > 2) optimal = calculateTotal(curHand.cards) >= 18 ? 'stand' : 'hit';
     const strategyAction = actionType === 'doubleFaceDown' ? 'double' : actionType;
-    
-    if (strategyAction !== optimal) {
-      if (!warnStrategy || !showStrategyPopups) {
-        setStrategyDecisions(current => current + 1);
-        setStrategyMistakes(current => current + 1);
-        executeRequestedAction(actionType);
-      } else {
-        setStrategyDecisions(current => current + 1);
-        setStrategyMistakes(current => current + 1);
-        setPendingAction({
-          intended: actionType,
-          optimal,
-          type: 'play',
-          category: evaluation.type,
-          revealHint: false,
-          rule: evaluation.rule,
-        });
-      }
-    } else {
+    const isMistake = strategyAction !== optimal;
+
+    if (!decisionGradedRef.current) {
       setStrategyDecisions(current => current + 1);
+      if (isMistake) setStrategyMistakes(current => current + 1);
+      decisionGradedRef.current = true;
+    }
+    if (isMistake && warnStrategy && showStrategyPopups) {
+      setPendingAction({
+        intended: actionType,
+        optimal,
+        type: 'play',
+        category: evaluation.type,
+        revealHint: false,
+        rule: evaluation.rule,
+      });
+    } else {
       executeRequestedAction(actionType);
     }
   };
@@ -1099,6 +1103,7 @@ export default function App() {
   const resolvePendingAction = (proceed) => {
     const action = pendingAction;
     setPendingAction(null);
+    setHintedAction(null);
     if (action.type === 'betSizing') {
       if (proceed) {
         deal(action.bets, { skipBetWarning: true });
@@ -1129,7 +1134,7 @@ export default function App() {
     }
 
     const hand = getCurrentActiveHand();
-    if (gameState !== 'playing' || !hand || !dealerHand[0]) {
+    if (gameState !== 'playing' || !hand || !dealerHand[0] || hintedAction) {
       return;
     }
     const evaluation = getDetailedPlay(
@@ -1147,8 +1152,10 @@ export default function App() {
       recommendedAction = calculateTotal(hand.cards) >= 18 ? 'stand' : 'hit';
     }
     setHintedAction(recommendedAction);
+    if (decisionGradedRef.current) return;
     setStrategyDecisions(current => current + 1);
     setStrategyMistakes(current => current + 1);
+    decisionGradedRef.current = true;
   };
 
   const canSplitCurrent = () => {

@@ -33,8 +33,9 @@ Play the current build at [hguan-dev.github.io/counting](https://hguan-dev.githu
 - A strategy quiz that deals only close calls and count deviations, the spots where
   the best play beats the next best by less than 0.08 units.
 
-Asking for a hint or triggering a strategy warning counts as one mistake. A warned
-decision is never double-counted if the player then reveals the hint or plays anyway.
+Asking for a hint or triggering a strategy warning counts as one mistake. Each decision
+is counted once, however many times the player asks for the hint, goes back, or plays
+anyway.
 
 ## Keyboard shortcuts
 
