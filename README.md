@@ -20,8 +20,10 @@ Play the current build at [hguan-dev.github.io/counting](https://hguan-dev.githu
 
 ## Training and analytics
 
-- H17 basic strategy plus a complete in-app Hi-Lo deviation index, including surrender,
-  hard totals, doubles, soft doubles, pair splits, insurance, and even-money indices.
+- Basic strategy and Hi-Lo deviation charts that follow the table rules in Settings: H17
+  or S17, with or without late surrender. Indices follow Blackjack Apprenticeship's
+  six-deck H17 and S17 charts and cover surrender, hard totals, doubles, soft doubles,
+  pair splits, insurance, and even money. The same index set grades play at the table.
 - Strategy Guard warns before an off-strategy play. Its hint reveals and highlights the
   count-adjusted recommendation.
 - A $25-unit bet ramp: $25 through TC +1, $50 at +2, $100 at +3, $150 at +4, and $200
@@ -57,7 +59,8 @@ npm run lint
 npm run build
 ```
 
-The test suite covers hand totals, H17 basic strategy, Hi-Lo deviation thresholds,
+The test suite covers hand totals, H17 and S17 basic strategy, Hi-Lo deviation thresholds
+for both games with and without surrender,
 bet sizing, shoe behavior, split/resplit eligibility, surrender, split-ace behavior,
 post-split turn order, natural blackjack, keyboard shortcuts, card assets, quiz spot
 selection, and the bet spread optimizer.

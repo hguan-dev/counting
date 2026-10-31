@@ -45,11 +45,21 @@ export const HI_LO_DEVIATIONS = [
   },
   {
     category: 'Surrender',
+    game: 'H17',
     matchup: '15 vs Ace',
     index: 'Surrender at TC −1+',
     cell: { code: 'R ≥ −1', dealer: 11, hand: '15', surrender: 'with' },
     when: context => context.allowSurrender && isHard(context) && context.total === 15 && context.dealer === 11 && context.trueCount >= -1,
-    play: result('surrender', 'Surrender hard 15 vs Ace at TC −1 or higher in this H17 game.'),
+    play: result('surrender', 'Surrender hard 15 vs Ace at TC −1 or higher when the dealer hits soft 17.'),
+  },
+  {
+    category: 'Surrender',
+    game: 'S17',
+    matchup: '15 vs Ace',
+    index: 'Surrender at TC +2+',
+    cell: { code: 'R ≥ +2', dealer: 11, hand: '15', surrender: 'with' },
+    when: context => context.allowSurrender && isHard(context) && context.total === 15 && context.dealer === 11 && context.trueCount >= 2,
+    play: result('surrender', 'Surrender hard 15 vs Ace at TC +2 or higher when the dealer stands on soft 17.'),
   },
   {
     category: 'Surrender',
@@ -77,6 +87,7 @@ export const HI_LO_DEVIATIONS = [
   },
   {
     category: 'Hard totals',
+    game: 'H17',
     matchup: '16 vs Ace',
     index: 'Stand at TC +3+',
     cell: { code: 'S ≥ +3', dealer: 11, hand: '16', surrender: 'without' },
@@ -93,6 +104,7 @@ export const HI_LO_DEVIATIONS = [
   },
   {
     category: 'Hard totals',
+    game: 'H17',
     matchup: '15 vs Ace',
     index: 'Stand at TC +5+',
     cell: { code: 'S ≥ +5', dealer: 11, hand: '15', surrender: 'without' },
@@ -133,6 +145,15 @@ export const HI_LO_DEVIATIONS = [
   },
   {
     category: 'Doubling',
+    game: 'S17',
+    matchup: '11 vs Ace',
+    index: 'Double at TC +1+',
+    cell: { code: 'D ≥ +1', dealer: 11, hand: '11', surrender: null },
+    when: context => isHard(context) && context.total === 11 && context.dealer === 11 && context.trueCount >= 1,
+    play: result('double', 'Double hard 11 vs Ace at TC +1 or higher when the dealer stands on soft 17.'),
+  },
+  {
+    category: 'Doubling',
     matchup: '10 vs 10',
     index: 'Double at TC +4+',
     cell: { code: 'D ≥ +4', dealer: 10, hand: '10', surrender: null },
@@ -141,11 +162,21 @@ export const HI_LO_DEVIATIONS = [
   },
   {
     category: 'Doubling',
+    game: 'H17',
     matchup: '10 vs Ace',
     index: 'Double at TC +3+',
     cell: { code: 'D ≥ +3', dealer: 11, hand: '10', surrender: null },
     when: context => isHard(context) && context.total === 10 && context.dealer === 11 && context.trueCount >= 3,
-    play: result('double', 'Double hard 10 vs Ace at TC +3 or higher.'),
+    play: result('double', 'Double hard 10 vs Ace at TC +3 or higher when the dealer hits soft 17.'),
+  },
+  {
+    category: 'Doubling',
+    game: 'S17',
+    matchup: '10 vs Ace',
+    index: 'Double at TC +4+',
+    cell: { code: 'D ≥ +4', dealer: 11, hand: '10', surrender: null },
+    when: context => isHard(context) && context.total === 10 && context.dealer === 11 && context.trueCount >= 4,
+    play: result('double', 'Double hard 10 vs Ace at TC +4 or higher when the dealer stands on soft 17.'),
   },
   {
     category: 'Doubling',
@@ -189,11 +220,21 @@ export const HI_LO_DEVIATIONS = [
   },
   {
     category: 'Soft totals',
+    game: 'H17',
     matchup: 'A,8 vs 6',
     index: 'Stand at a negative running count',
     cell: { code: 'S RC<0', dealer: 6, hand: 'A,8', surrender: null },
     when: context => context.isSoft && context.total === 19 && context.dealer === 6 && context.zeroIndexCount < 0,
     play: result('stand', 'Stand on soft 19 vs 6 when the running count is negative; otherwise double.'),
+  },
+  {
+    category: 'Soft totals',
+    game: 'S17',
+    matchup: 'A,8 vs 6',
+    index: 'Double at TC +1+',
+    cell: { code: 'D ≥ +1', dealer: 6, hand: 'A,8', surrender: null },
+    when: context => context.isSoft && context.total === 19 && context.dealer === 6 && context.trueCount >= 1,
+    play: result('double', 'Double soft 19 vs 6 at TC +1 or higher when the dealer stands on soft 17.'),
   },
   {
     category: 'Soft totals',
@@ -229,19 +270,50 @@ export const HI_LO_DEVIATIONS = [
   },
 ];
 
-export const getDeviationPlay = context => (
-  HI_LO_DEVIATIONS.find(deviation => deviation.when(context))?.play || null
+const gameOf = rules => (rules && rules.dealerHitsSoft17 === false ? 'S17' : 'H17');
+const surrenderOf = rules => !rules || rules.lateSurrender !== false;
+
+/**
+ * The index set for a table. Entries without a `game` apply to both H17 and
+ * S17. Without late surrender the surrender-game indices drop out and only
+ * the no-surrender ones remain; with it both stay, because split and
+ * three-card hands still play the no-surrender indices.
+ */
+export const getDeviations = (rules) => {
+  const game = gameOf(rules);
+  const surrender = surrenderOf(rules);
+  return HI_LO_DEVIATIONS.filter(deviation => (
+    (!deviation.game || deviation.game === game)
+    && (surrender || deviation.cell.surrender !== 'with')
+  ));
+};
+
+export const getDeviationPlay = (context, rules = null) => (
+  getDeviations(rules).find(deviation => deviation.when(context))?.play || null
 );
 
-export const DEVIATION_GUIDE_GROUPS = [
-  {
-    title: 'Insurance',
-    rows: [['Insurance / even money', 'Take at TC +3+']],
-  },
-  ...['Surrender', 'Hard totals', 'Doubling', 'Soft totals', 'Splitting'].map(category => ({
-    title: category,
-    rows: HI_LO_DEVIATIONS
-      .filter(deviation => deviation.category === category)
-      .map(deviation => [deviation.matchup, deviation.index]),
-  })),
-];
+export const getDeviationGuideGroups = (rules) => {
+  const deviations = getDeviations(rules);
+  const surrender = surrenderOf(rules);
+  return [
+    {
+      title: 'Insurance',
+      rows: [['Insurance / even money', 'Take at TC +3+']],
+    },
+    ...['Surrender', 'Hard totals', 'Doubling', 'Soft totals', 'Splitting'].map(category => ({
+      title: category,
+      rows: deviations
+        .filter(deviation => deviation.category === category)
+        .map(deviation => [
+          surrender && deviation.cell.surrender === 'without'
+            ? `${deviation.matchup} (no surrender)`
+            : deviation.matchup,
+          deviation.index,
+        ]),
+    })).filter(group => group.rows.length > 0),
+  ];
+};
+
+export const describeIndexSet = rules => (
+  `Six-deck ${gameOf(rules)}, ${surrenderOf(rules) ? 'late surrender' : 'no surrender'} indices`
+);

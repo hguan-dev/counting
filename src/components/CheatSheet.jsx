@@ -3,7 +3,7 @@ import StrategyQuiz from './StrategyQuiz';
 import StrategyChart from './StrategyChart';
 import BetSpreadLab from './BetSpreadLab';
 import DeviationChart from './DeviationChart';
-import { DEVIATION_GUIDE_GROUPS } from '../utils/deviations';
+import { describeIndexSet, getDeviationGuideGroups } from '../utils/deviations';
 import { describeRules } from '../utils/tableRules';
 
 function GuideTable({ rows, headings }) {
@@ -81,13 +81,14 @@ export default function CheatSheet({
 
             <section className="chart-section">
               <h3>Hi-Lo deviations</h3>
+              <p className="section-intro">{describeIndexSet(rules)}.</p>
               <DeviationChart rules={rules} />
             </section>
 
             <details>
               <summary>Deviations as a list</summary>
-              <p className="section-intro">Six-deck H17, DAS, late surrender indices. RC means running count; all other indices use the rounded true count.</p>
-              {DEVIATION_GUIDE_GROUPS.map(group => (
+              <p className="section-intro">{describeIndexSet(rules)}. RC means running count; all other indices use the rounded true count.</p>
+              {getDeviationGuideGroups(rules).map(group => (
                 <div className="deviation-group" key={group.title}>
                   <h4>{group.title}</h4>
                   <GuideTable rows={group.rows} headings={['Matchup', 'Deviation']} />

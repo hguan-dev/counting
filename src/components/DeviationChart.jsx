@@ -1,9 +1,9 @@
-import { HI_LO_DEVIATIONS } from '../utils/deviations';
+import { getDeviations } from '../utils/deviations';
 
 const DEALER_UPCARDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 const ROWS = [
   ['16', 'Hard 16'], ['15', 'Hard 15'], ['14', 'Hard 14'], ['13', 'Hard 13'], ['12', 'Hard 12'],
-  ['10', 'Hard 10'], ['9', 'Hard 9'], ['8', 'Hard 8'],
+  ['11', 'Hard 11'], ['10', 'Hard 10'], ['9', 'Hard 9'], ['8', 'Hard 8'],
   ['A,8', 'Soft 19'], ['A,6', 'Soft 17'],
   ['10,10', 'Pair 10s'],
   ['insurance', 'Insurance'],
@@ -11,13 +11,12 @@ const ROWS = [
 
 const ACTION_BY_CODE = { D: 'double', H: 'hit', P: 'split', R: 'surrender', S: 'stand' };
 
-const cellsFor = (hand, dealer, surrenderOffered) => {
+const cellsFor = (deviations, hand, dealer) => {
   if (hand === 'insurance') {
     return dealer === 11 ? [{ code: 'Take ≥ +3', action: 'insurance', context: null }] : [];
   }
-  return HI_LO_DEVIATIONS
+  return deviations
     .filter(deviation => deviation.cell.hand === hand && deviation.cell.dealer === dealer)
-    .filter(deviation => surrenderOffered || deviation.cell.surrender !== 'with')
     .map(deviation => ({
       action: ACTION_BY_CODE[deviation.cell.code[0]] || 'hit',
       code: deviation.cell.code,
@@ -30,6 +29,12 @@ const cellsFor = (hand, dealer, surrenderOffered) => {
 
 export default function DeviationChart({ rules }) {
   const surrenderOffered = rules?.lateSurrender !== false;
+  const deviations = getDeviations(rules);
+  // Only the rows this table's index set actually uses, e.g. hard 11 is an
+  // S17 index and drops out at an H17 table.
+  const rows = ROWS
+    .map(([hand, label]) => ({ hand, label, cells: DEALER_UPCARDS.map(dealer => cellsFor(deviations, hand, dealer)) }))
+    .filter(row => row.cells.some(cells => cells.length > 0));
 
   return (
     <div className="strategy-charts deviation-charts">
@@ -54,11 +59,11 @@ export default function DeviationChart({ rules }) {
             </tr>
           </thead>
           <tbody>
-            {ROWS.map(([hand, label]) => (
+            {rows.map(({ hand, label, cells: rowCells }) => (
               <tr key={hand}>
                 <th scope="row">{label}</th>
-                {DEALER_UPCARDS.map((dealer) => {
-                  const cells = cellsFor(hand, dealer, surrenderOffered);
+                {DEALER_UPCARDS.map((dealer, index) => {
+                  const cells = rowCells[index];
                   const primary = cells[0];
                   const secondary = cells.slice(1);
                   return (

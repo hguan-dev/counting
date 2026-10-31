@@ -83,7 +83,7 @@ export const getDetailedPlay = (
       total: p,
       trueCount: tc,
       zeroIndexCount,
-    });
+    }, rules);
     if (deviation) return deviation;
   }
 
@@ -101,7 +101,7 @@ export const getDetailedPlay = (
     if (p === 15 && d === 10 && (ignoreDeviations || zeroIndexCount >= 0)) {
       return ignoreDeviations
         ? basic('surrender', 'Surrender hard 15 against a 10.')
-        : { action: 'surrender', type: 'H17 Surrender Index', rule: 'Surrender hard 15 vs 10 at a running count of 0 or higher.' };
+        : { action: 'surrender', type: 'Surrender Index', rule: 'Surrender hard 15 vs 10 at a running count of 0 or higher.' };
     }
     if (p === 15 && d === 11 && h17 && ignoreDeviations) {
       return basic('surrender', 'Surrender hard 15 against an Ace when the dealer hits soft 17.');
