@@ -195,6 +195,10 @@ export default function CheatSheet({
       <div className="study-footer">
         Strategy and spread shown are tailored to the rules in Settings: {describeRules(rules)}.
       </div>
+
+      <div className="drawer-done-bar">
+        <button type="button" className="drawer-done" onClick={onClose}>Done</button>
+      </div>
     </aside>
   );
 }

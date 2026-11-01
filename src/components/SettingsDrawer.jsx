@@ -360,6 +360,10 @@ export default function SettingsDrawer({
             </p>
           </section>
         </div>
+
+        <div className="drawer-done-bar">
+          <button type="button" className="drawer-done" onClick={onClose}>Done</button>
+        </div>
       </aside>
     </>
   );
