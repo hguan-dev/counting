@@ -76,7 +76,10 @@ image server, and the UI still includes a built-in text-card fallback.
 
 Pushes to `main` run the GitHub Actions workflow in `.github/workflows/deploy-pages.yml`.
 It builds the Vite app with the `/counting/` base path and publishes the `dist` artifact
-to GitHub Pages. No backend or shared server state is required, so multiple players can
+to GitHub Pages. A service worker from `vite-plugin-pwa` precaches the build, about 1.3 MB
+of app code, fonts, the 52 card faces and icons, so after one online visit the site works
+offline. Add it to the home screen to open it as an app without a connection, and a new
+deploy takes over the next time it is opened. No backend or shared server state is required, so multiple players can
 use the site simultaneously; each session stays in that player's browser.
 
 Count Lab is a practice tool, not gambling or financial advice. Casino rules and
